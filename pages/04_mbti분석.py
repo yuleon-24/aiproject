@@ -21,6 +21,7 @@ MBTI_TYPES = [
     "ESTP", "ISTJ", "ENFJ", "ESFJ"
 ]
 
+
 # --------------------------------
 # 2. 디자인 설정
 # --------------------------------
@@ -54,10 +55,20 @@ div[data-testid="stMetric"] {
 @st.cache_data
 def load_data():
 
-    csv_path = Path(__file__).parent / "countriesMBTI_16types(1).csv"
+    # pages 폴더의 상위 폴더에서 CSV 찾기
+    csv_path = (
+        Path(__file__).resolve().parent.parent
+        / "countriesMBTI_16types(1).csv"
+    )
+
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"CSV 파일을 찾을 수 없습니다: {csv_path}"
+        )
 
     data = pd.read_csv(csv_path)
 
+    # 필요한 열 확인
     missing_columns = [
         col for col in ["Country"] + MBTI_TYPES
         if col not in data.columns
@@ -68,13 +79,18 @@ def load_data():
             f"CSV에 필요한 열이 없습니다: {missing_columns}"
         )
 
-    data["Country"] = data["Country"].astype(str).str.strip()
+    data["Country"] = (
+        data["Country"].astype(str).str.strip()
+    )
 
+    # 숫자 데이터 변환
     for col in MBTI_TYPES:
         data[col] = pd.to_numeric(
-            data[col], errors="coerce"
+            data[col],
+            errors="coerce"
         )
 
+    # 결측값 제거
     data = data.dropna(
         subset=["Country"] + MBTI_TYPES
     )
@@ -87,7 +103,9 @@ def load_data():
 # --------------------------------
 
 st.markdown(
-    '<div class="main-title">🌍 세계 국가별 MBTI 통계</div>',
+    '<div class="main-title">'
+    '🌍 세계 국가별 MBTI 통계'
+    '</div>',
     unsafe_allow_html=True
 )
 
@@ -99,20 +117,29 @@ st.markdown(
 )
 
 
-# 데이터 오류 처리
+# --------------------------------
+# 5. 데이터 오류 처리
+# --------------------------------
+
 try:
+
     df = load_data()
 
 except Exception as error:
-    st.error(f"데이터를 불러오지 못했습니다: {error}")
-    st.info(
-        "CSV 파일이 app.py와 같은 폴더에 있는지 확인하세요."
+
+    st.error(
+        f"데이터를 불러오지 못했습니다: {error}"
     )
+
+    st.info(
+        "CSV 파일이 프로젝트 최상위 폴더에 있는지 확인하세요."
+    )
+
     st.stop()
 
 
 # --------------------------------
-# 5. 국가 선택
+# 6. 국가 선택
 # --------------------------------
 
 country_list = sorted(
@@ -143,7 +170,7 @@ with right:
 
 
 # --------------------------------
-# 6. 선택 국가 데이터 추출
+# 7. 선택 국가 데이터 추출
 # --------------------------------
 
 selected_row = df.loc[
@@ -151,16 +178,19 @@ selected_row = df.loc[
 ].iloc[0]
 
 chart_data = pd.DataFrame({
+
     "MBTI": MBTI_TYPES,
+
     "비율": [
         float(selected_row[mbti]) * 100
         for mbti in MBTI_TYPES
     ]
+
 })
 
 
 # --------------------------------
-# 7. 그래프 정렬
+# 8. 그래프 정렬
 # --------------------------------
 
 if sort_order == "높은 비율순":
@@ -178,21 +208,21 @@ else:
 
 
 # --------------------------------
-# 8. 그래프 색상 설정
+# 9. 그래프 색상 설정
 # --------------------------------
 
-# 가장 높은 비율의 MBTI 찾기
+# 비율이 가장 높은 MBTI 찾기
 ranked = chart_data.sort_values(
     "비율",
     ascending=False
 ).reset_index(drop=True)
 
-# 1위는 빨간색
+# 1위 빨간색
 color_by_mbti = {
     ranked.loc[0, "MBTI"]: "#EF4444"
 }
 
-# 나머지는 파란색 그라데이션
+# 나머지 파란색 그라데이션
 blue_palette = [
     "#2563EB",
     "#3B82F6",
@@ -214,7 +244,7 @@ blue_palette = [
 for rank, row in ranked.iloc[1:].iterrows():
 
     color_by_mbti[row["MBTI"]] = blue_palette[
-        min(rank - 0, len(blue_palette) - 1)
+        min(rank - 1, len(blue_palette) - 1)
     ]
 
 chart_data["색상"] = chart_data["MBTI"].map(
@@ -223,7 +253,7 @@ chart_data["색상"] = chart_data["MBTI"].map(
 
 
 # --------------------------------
-# 9. 통계 정보
+# 10. 통계 정보
 # --------------------------------
 
 top_mbti = ranked.iloc[0]["MBTI"]
@@ -252,7 +282,7 @@ metric3.metric(
 
 
 # --------------------------------
-# 10. MBTI 그래프 생성
+# 11. MBTI 그래프 생성
 # --------------------------------
 
 st.subheader(
@@ -263,8 +293,11 @@ fig = go.Figure()
 
 fig.add_trace(
     go.Bar(
+
         x=chart_data["비율"],
+
         y=chart_data["MBTI"],
+
         orientation="h",
 
         marker=dict(
@@ -281,18 +314,20 @@ fig.add_trace(
         ],
 
         textposition="outside",
+
         cliponaxis=False,
 
         hovertemplate=
         "<b>%{y}</b><br>"
         "비율: %{x:.2f}%"
         "<extra></extra>"
+
     )
 )
 
 
 # --------------------------------
-# 11. 그래프 디자인
+# 12. 그래프 디자인
 # --------------------------------
 
 fig.update_layout(
@@ -327,10 +362,14 @@ fig.update_layout(
     showlegend=False,
 
     font=dict(size=13)
+
 )
 
 
-# 그래프 출력
+# --------------------------------
+# 13. 그래프 출력
+# --------------------------------
+
 st.plotly_chart(
     fig,
     use_container_width=True
@@ -338,10 +377,12 @@ st.plotly_chart(
 
 
 # --------------------------------
-# 12. 상세 데이터 표
+# 14. 상세 데이터 표
 # --------------------------------
 
-with st.expander("선택한 국가의 상세 데이터 보기"):
+with st.expander(
+    "선택한 국가의 상세 데이터 보기"
+):
 
     display_data = chart_data[
         ["MBTI", "비율"]
@@ -349,7 +390,9 @@ with st.expander("선택한 국가의 상세 데이터 보기"):
 
     display_data["비율"] = display_data[
         "비율"
-    ].map(lambda x: f"{x:.2f}%")
+    ].map(
+        lambda x: f"{x:.2f}%"
+    )
 
     st.dataframe(
         display_data,
@@ -359,7 +402,7 @@ with st.expander("선택한 국가의 상세 데이터 보기"):
 
 
 # --------------------------------
-# 13. 하단 안내
+# 15. 하단 안내
 # --------------------------------
 
 st.caption(
