@@ -58,7 +58,7 @@ def load_data():
     # pages 폴더의 상위 폴더에서 CSV 찾기
     csv_path = (
         Path(__file__).resolve().parent.parent
-        / "countriesMBTI_16types(1).csv"
+        / "countriesMBTI_16types.csv"
     )
 
     if not csv_path.exists():
