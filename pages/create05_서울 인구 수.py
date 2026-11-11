@@ -7,7 +7,7 @@ import re
 import math
 
 # ==========================================
-# 1. 페이지 설정
+# 1. 페이지 기본 설정
 # ==========================================
 
 st.set_page_config(
@@ -17,25 +17,22 @@ st.set_page_config(
 )
 
 st.title("📊 서울시 연령별 인구 분석")
-st.caption("행정구역 · 연도 · 성별에 따른 인구 분포 분석")
-
+st.write("행정구역, 연도, 성별에 따른 인구 분포를 분석합니다.")
 
 # ==========================================
-# 2. CSV 파일 불러오기
+# 2. CSV 데이터 불러오기
 # ==========================================
 
 @st.cache_data
 def load_data():
 
-    # pages 폴더의 상위 폴더
-    base_dir = Path(__file__).resolve().parent.parent
-
-    # CSV 파일 위치
-    file_path = base_dir / "population.csv"
+    # app.py와 같은 폴더에서 CSV 찾기
+    file_path = Path(__file__).resolve().parent / "population.csv"
 
     if not file_path.exists():
         raise FileNotFoundError(
-            f"CSV 파일을 찾을 수 없습니다.\n{file_path}"
+            f"population.csv 파일을 찾을 수 없습니다.\n"
+            f"파일 위치: {file_path}"
         )
 
     # 한글 인코딩 자동 확인
@@ -62,9 +59,7 @@ def load_data():
             continue
 
     if data is None:
-        raise ValueError(
-            "CSV 파일의 한글 인코딩을 확인해주세요."
-        )
+        raise ValueError("CSV 파일의 인코딩을 확인해주세요.")
 
     # 열 이름 정리
     data.columns = [
@@ -72,9 +67,8 @@ def load_data():
         for col in data.columns
     ]
 
-    # 숫자 데이터 변환
+    # 인구수 숫자 변환
     for col in data.columns:
-
         if col != "행정구역":
 
             data[col] = pd.to_numeric(
@@ -89,86 +83,46 @@ def load_data():
 
 
 try:
-
-    df, used_encoding = load_data()
+    df, encoding = load_data()
 
 except Exception as e:
-
     st.error(f"데이터 불러오기 오류: {e}")
     st.stop()
 
 
 # ==========================================
-# 3. 열 이름 정규화
+# 3. 연도 자동 추출
 # ==========================================
 
-def normalize_column(column):
-
-    # BOM 제거
-    column = str(column).replace("\ufeff", "")
-
-    # 모든 공백 제거
-    column = re.sub(r"\s+", "", column)
-
-    return column
-
-
-# 실제 CSV 열 이름과 정규화된 열 이름 연결
-column_lookup = {
-    normalize_column(col): col
-    for col in df.columns
-}
-
-
-# ==========================================
-# 4. 연도 자동 추출
-# ==========================================
-
-years = []
+years = set()
 
 for column in df.columns:
 
-    normalized = normalize_column(column)
-
-    if "년_" in normalized:
-
-        year_part = normalized.split("년_", 1)[0]
-
-        if (
-            len(year_part) == 4
-            and year_part.isdigit()
-            and year_part not in years
-        ):
-
-            years.append(year_part)
-
-# 연도 오름차순 정렬
-years = sorted(years, key=int)
-
-if not years:
-
-    st.error("CSV 파일에서 연도를 찾을 수 없습니다.")
-
-    st.write("실제 CSV 열 이름 확인")
-
-    st.code(
-        "\n".join(str(col) for col in df.columns[:40])
+    match = re.match(
+        r"^(\d{4})년_",
+        str(column).strip()
     )
 
+    if match:
+        years.add(match.group(1))
+
+years = sorted(years)
+
+if not years:
+    st.error("CSV 파일에서 연도를 찾을 수 없습니다.")
     st.stop()
 
 
 # ==========================================
-# 5. 행정구역 설정
+# 4. 행정구역 설정
 # ==========================================
 
 if "행정구역" not in df.columns:
-
-    st.error("CSV 파일에 행정구역 열이 없습니다.")
+    st.error("행정구역 열을 찾을 수 없습니다.")
     st.stop()
 
-
-df["구역명"] = (
+# 괄호 안의 행정구역 코드 제거
+df["행정구역명"] = (
     df["행정구역"]
     .astype(str)
     .str.split("(")
@@ -176,19 +130,18 @@ df["구역명"] = (
     .str.strip()
 )
 
-regions = df["구역명"].dropna().unique().tolist()
+regions = df["행정구역명"].dropna().unique().tolist()
 
 if not regions:
-
-    st.error("행정구역 데이터를 찾을 수 없습니다.")
+    st.error("행정구역 데이터가 없습니다.")
     st.stop()
 
 
 # ==========================================
-# 6. 연령대 설정
+# 5. 연령대 설정
 # ==========================================
 
-age_columns = [
+ages = [
     "0~9세",
     "10~19세",
     "20~29세",
@@ -204,7 +157,7 @@ age_columns = [
 
 
 # ==========================================
-# 7. 분석 조건 선택
+# 6. 분석 조건 선택
 # ==========================================
 
 st.divider()
@@ -214,89 +167,76 @@ st.subheader("🔍 분석 조건 선택")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-
     selected_region = st.selectbox(
-        "행정구역 선택",
+        "행정구역",
         regions
     )
 
 with col2:
-
     selected_year = st.selectbox(
-        "연도 선택",
+        "연도",
         years,
         index=len(years) - 1,
         format_func=lambda x: f"{x}년"
     )
 
 with col3:
-
     selected_gender = st.selectbox(
-        "성별 선택",
+        "성별",
         ["전체", "남성", "여성"]
     )
 
 
 # ==========================================
-# 8. 성별별 데이터 선택
+# 7. 성별에 따른 데이터 선택
 # ==========================================
 
-gender_prefix = {
+gender_columns = {
     "전체": "거주자",
     "남성": "남_거주자",
     "여성": "여_거주자"
 }
 
-prefix = gender_prefix[selected_gender]
+gender_prefix = gender_columns[selected_gender]
 
 
 # ==========================================
-# 9. 선택한 행정구역 데이터 가져오기
+# 8. 선택한 행정구역 데이터 가져오기
 # ==========================================
 
-region_data = df[
-    df["구역명"] == selected_region
+selected_data = df[
+    df["행정구역명"] == selected_region
 ]
 
-if region_data.empty:
-
-    st.error("해당 행정구역의 데이터가 없습니다.")
+if selected_data.empty:
+    st.error("선택한 행정구역의 데이터가 없습니다.")
     st.stop()
 
-region_data = region_data.iloc[0]
+selected_data = selected_data.iloc[0]
 
 
 # ==========================================
-# 10. 연령대별 인구 추출
+# 9. 연령대별 인구 추출
 # ==========================================
 
 population_values = []
-
 missing_columns = []
 
-for age in age_columns:
+for age in ages:
 
-    # 찾을 열 이름
-    target_column = (
+    column_name = (
         f"{selected_year}년_"
-        f"{prefix}_{age}"
+        f"{gender_prefix}_{age}"
     )
 
-    # 공백 제거 후 실제 열 이름 검색
-    normalized_target = normalize_column(target_column)
+    if column_name not in df.columns:
 
-    actual_column = column_lookup.get(
-        normalized_target
-    )
-
-    if actual_column is None:
-
+        missing_columns.append(column_name)
         population_values.append(0)
-        missing_columns.append(target_column)
 
     else:
 
-        value = region_data[actual_column]
+        value = selected_data[column_name]
 
         if pd.isna(value):
             value = 0
@@ -304,41 +244,30 @@ for age in age_columns:
         population_values.append(int(value))
 
 
-# 데이터 확인
+# 데이터 누락 확인
+if missing_columns:
+
+    st.error(
+        "일부 연령대 데이터를 찾을 수 없습니다.\n"
+        + ", ".join(missing_columns)
+    )
+    st.stop()
+
+
+# ==========================================
+# 10. 분석 데이터 생성
+# ==========================================
+
 chart_df = pd.DataFrame({
-    "연령대": age_columns,
+    "나이": ages,
     "인구수": population_values
 })
 
+total_population = chart_df["인구수"].sum()
 
-# 누락된 데이터 확인
-if missing_columns:
-
-    st.warning(
-        "일부 연령대 데이터 열을 찾지 못했습니다: "
-        + ", ".join(missing_columns)
-    )
-
-
-# 전체 인구 계산
-total_column = normalize_column(
-    f"{selected_year}년_{prefix}_총인구수"
-)
-
-actual_total_column = column_lookup.get(total_column)
-
-if actual_total_column is not None:
-
-    total_population = region_data[actual_total_column]
-
-    if pd.isna(total_population):
-        total_population = chart_df["인구수"].sum()
-
-else:
-
-    total_population = chart_df["인구수"].sum()
-
-total_population = int(total_population)
+if total_population <= 0:
+    st.warning("선택한 조건에 인구 데이터가 없습니다.")
+    st.stop()
 
 
 # ==========================================
@@ -352,21 +281,18 @@ st.subheader("📌 분석 결과")
 metric1, metric2, metric3 = st.columns(3)
 
 with metric1:
-
     st.metric(
         "행정구역",
         selected_region
     )
 
 with metric2:
-
     st.metric(
-        "분석 연도",
+        "연도",
         f"{selected_year}년"
     )
 
 with metric3:
-
     st.metric(
         "총인구수",
         f"{total_population:,}명"
@@ -416,18 +342,13 @@ st.subheader("📈 연령대별 인구 분포")
 fig = go.Figure()
 
 fig.add_trace(
-
     go.Bar(
-
-        x=chart_df["연령대"],
-
+        x=chart_df["나이"],
         y=chart_df["인구수"],
 
         name="인구수",
 
-        marker=dict(
-            color="#2E8B57"
-        ),
+        marker_color="#2E8B57",
 
         text=[
             f"{value:,}"
@@ -437,7 +358,7 @@ fig.add_trace(
         textposition="outside",
 
         hovertemplate=(
-            "연령대: %{x}<br>"
+            "나이: %{x}<br>"
             "인구수: %{y:,}명"
             "<extra></extra>"
         )
@@ -451,7 +372,7 @@ fig.add_trace(
 
 fig.update_layout(
 
-    height=580,
+    height=550,
 
     plot_bgcolor="white",
 
@@ -464,27 +385,19 @@ fig.update_layout(
     ),
 
     xaxis=dict(
-
         title="나이",
-
         type="category",
-
         categoryorder="array",
-
-        categoryarray=age_columns,
-
-        showgrid=False,
-
-        tickangle=0
+        categoryarray=ages,
+        showgrid=False
     ),
 
     yaxis=dict(
-
         title="인구수 (명)",
 
         showgrid=True,
 
-        gridcolor="#D9E5DC",
+        gridcolor="#C8D8CC",
 
         gridwidth=1,
 
@@ -500,9 +413,7 @@ fig.update_layout(
 
         zeroline=True,
 
-        zerolinecolor="#888888",
-
-        zerolinewidth=1
+        zerolinecolor="#888888"
     ),
 
     bargap=0.25,
@@ -517,7 +428,7 @@ fig.update_layout(
     )
 )
 
-# 그래프 세로축 범위
+# 세로축 최대 범위
 fig.update_yaxes(
     range=[
         0,
@@ -525,6 +436,7 @@ fig.update_yaxes(
     ]
 )
 
+# 그래프 출력
 st.plotly_chart(
     fig,
     use_container_width=True
@@ -532,7 +444,7 @@ st.plotly_chart(
 
 
 # ==========================================
-# 15. 상세 인구 데이터
+# 15. 상세 데이터 표
 # ==========================================
 
 with st.expander("📋 연령대별 상세 인구 데이터"):
@@ -541,9 +453,7 @@ with st.expander("📋 연령대별 상세 인구 데이터"):
 
     display_df["인구수"] = display_df[
         "인구수"
-    ].apply(
-        lambda x: f"{x:,}명"
-    )
+    ].apply(lambda x: f"{x:,}명")
 
     st.dataframe(
         display_df,
@@ -561,7 +471,6 @@ csv_data = chart_df.to_csv(
 ).encode("utf-8-sig")
 
 st.download_button(
-
     label="📥 분석 결과 CSV 다운로드",
 
     data=csv_data,
@@ -582,26 +491,15 @@ st.download_button(
 
 with st.expander("⚙️ 데이터 정보"):
 
-    st.write(
-        f"파일 인코딩: {used_encoding}"
-    )
+    st.write(f"파일 인코딩: {encoding}")
 
-    st.write(
-        f"전체 데이터 크기: {df.shape}"
-    )
+    st.write(f"데이터 크기: {df.shape}")
 
-    st.write(
-        f"분석 가능한 연도: {', '.join(years)}"
-    )
+    st.write(f"분석 가능 연도: {', '.join(years)}")
 
-    st.write(
-        f"행정구역 개수: {len(regions)}"
-    )
+    st.write(f"행정구역 개수: {len(regions)}")
 
-    st.write(
-        f"CSV 파일 경로: "
-        f"{Path(__file__).resolve().parent.parent / 'population.csv'}"
-    )
+    st.write("사용 데이터: population.csv")
 
 
 # ==========================================
@@ -611,5 +509,5 @@ with st.expander("⚙️ 데이터 정보"):
 st.divider()
 
 st.caption(
-    "서울시 인구 통계 데이터를 활용한 연령대별 인구 분석 프로그램"
+    "서울시 연령별 인구 분석 프로그램"
 )
