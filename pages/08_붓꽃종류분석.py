@@ -1,495 +1,595 @@
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-
+import re
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import streamlit as st
 from sklearn.ensemble import RandomForestClassifier
 
 
-# ==========================================
-# 1. 웹앱 기본 설정
-# ==========================================
-
+# --------------------------------------------------
+# Page settings
+# --------------------------------------------------
 st.set_page_config(
-    page_title="붓꽃 품종 예측",
+    page_title="Iris Species Predictor",
     page_icon="🌸",
-    layout="wide"
-)
-
-st.title("🌸 붓꽃 품종 예측 프로그램")
-
-st.write(
-    "꽃받침과 꽃잎의 길이와 너비를 입력하면 "
-    "머신러닝 알고리즘이 붓꽃의 품종을 예측합니다."
-)
-
-st.caption(
-    "분류 알고리즘: 랜덤 포레스트(Random Forest)"
+    layout="wide",
 )
 
 
-# ==========================================
-# 2. CSV 파일 자동 탐색 및 불러오기
-# ==========================================
+# --------------------------------------------------
+# Styling
+# --------------------------------------------------
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background: #0b1120;
+        color: #f3f4f6;
+    }
 
+    .main-title {
+        font-size: 2.45rem;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: #f9fafb;
+        margin-bottom: 0.25rem;
+    }
+
+    .main-subtitle {
+        color: #9ca3af;
+        font-size: 1rem;
+        margin-bottom: 1.8rem;
+    }
+
+    .section-label {
+        color: #818cf8;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        margin-bottom: 0.3rem;
+    }
+
+    .section-title {
+        color: #f9fafb;
+        font-size: 1.45rem;
+        font-weight: 750;
+        margin-bottom: 0.3rem;
+    }
+
+    .section-description {
+        color: #9ca3af;
+        font-size: 0.92rem;
+        margin-bottom: 1rem;
+    }
+
+    div[data-testid="stMetric"] {
+        background: #111827;
+        border: 1px solid #263244;
+        padding: 1rem;
+        border-radius: 14px;
+    }
+
+    div[data-testid="stMetricLabel"] {
+        color: #9ca3af;
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #f9fafb;
+    }
+
+    div[data-testid="stSidebar"] {
+        background: #111827;
+    }
+
+    .stButton > button {
+        width: 100%;
+        border-radius: 10px;
+        font-weight: 700;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# --------------------------------------------------
+# Dataset loading
+# --------------------------------------------------
 FEATURES = [
     "SepalLengthCm",
     "SepalWidthCm",
     "PetalLengthCm",
-    "PetalWidthCm"
+    "PetalWidthCm",
 ]
+
+FEATURE_LABELS = {
+    "SepalLengthCm": "Sepal Length (cm)",
+    "SepalWidthCm": "Sepal Width (cm)",
+    "PetalLengthCm": "Petal Length (cm)",
+    "PetalWidthCm": "Petal Width (cm)",
+}
 
 TARGET = "Species"
 
 
+def normalize_column_name(name):
+    """Remove spaces and symbols to make column matching easier."""
+    return re.sub(r"[^a-z0-9]", "", str(name).lower())
+
+
+def standardize_columns(dataframe):
+    """Convert common Iris CSV column names to standard names."""
+    aliases = {
+        "sepallengthcm": "SepalLengthCm",
+        "sepallength": "SepalLengthCm",
+        "sepal_length": "SepalLengthCm",
+        "sepalwidthcm": "SepalWidthCm",
+        "sepalwidth": "SepalWidthCm",
+        "sepal_width": "SepalWidthCm",
+        "petallengthcm": "PetalLengthCm",
+        "petallength": "PetalLengthCm",
+        "petal_length": "PetalLengthCm",
+        "petalwidthcm": "PetalWidthCm",
+        "petalwidth": "PetalWidthCm",
+        "petal_width": "PetalWidthCm",
+        "species": "Species",
+        "class": "Species",
+        "target": "Species",
+        "variety": "Species",
+    }
+
+    renamed = {}
+
+    for column in dataframe.columns:
+        normalized = normalize_column_name(column)
+        if normalized in aliases:
+            renamed[column] = aliases[normalized]
+
+    dataframe = dataframe.rename(columns=renamed)
+
+    missing = [column for column in FEATURES + [TARGET] if column not in dataframe.columns]
+    if missing:
+        raise ValueError(
+            "The CSV does not contain the required Iris columns: "
+            + ", ".join(missing)
+        )
+
+    dataframe = dataframe[FEATURES + [TARGET]].copy()
+
+    for column in FEATURES:
+        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
+
+    dataframe = dataframe.dropna(subset=FEATURES + [TARGET])
+    dataframe[TARGET] = dataframe[TARGET].astype(str)
+
+    return dataframe
+
+
 def find_iris_csv():
+    """Look for a suitable Iris CSV in common project folders."""
+    current_folder = Path.cwd()
 
-    # app.py가 있는 폴더
-    current_dir = Path(__file__).resolve().parent
-
-    # app.py가 있는 폴더의 상위 폴더
-    parent_dir = current_dir.parent
-
-    # Streamlit이 실행되는 현재 작업 폴더
-    working_dir = Path.cwd()
-
-    # 검색할 폴더 목록
-    search_dirs = [
-        current_dir,
-        parent_dir,
-        working_dir
+    search_folders = [
+        current_folder,
+        current_folder / "data",
+        current_folder.parent,
+        current_folder.parent / "data",
     ]
 
-    # 중복 폴더 제거
-    search_dirs = list(dict.fromkeys(search_dirs))
-
-    # 파일 이름이 달라도 CSV 파일을 찾을 수 있도록 설정
-    candidate_files = []
-
-    for folder in search_dirs:
-
-        if folder.exists():
-
-            # 같은 폴더에 있는 CSV 파일 검색
-            candidate_files.extend(folder.glob("*.csv"))
-
-            # 자주 사용하는 파일명도 확인
-            candidate_files.extend([
-                folder / "iris.csv",
-                folder / "Iris.csv",
-                folder / "Iris (1).csv"
-            ])
-
-    # 중복 파일 경로 제거
-    candidate_files = list(
-        dict.fromkeys(candidate_files)
-    )
-
-    # 파일이 실제로 존재하는지 확인
-    candidate_files = [
-        file_path
-        for file_path in candidate_files
-        if file_path.is_file()
+    preferred_names = [
+        "iris.csv",
+        "Iris.csv",
+        "iris (1).csv",
+        "Iris (1).csv",
     ]
 
-    # 파일 이름이 아니라 열 이름을 기준으로 데이터 확인
-    for file_path in candidate_files:
+    checked_paths = []
 
+    for folder in search_folders:
+        if not folder.exists():
+            continue
+
+        for filename in preferred_names:
+            path = folder / filename
+            if path.exists() and path not in checked_paths:
+                checked_paths.append(path)
+
+        for path in folder.glob("*.csv"):
+            if path not in checked_paths:
+                checked_paths.append(path)
+
+    for path in checked_paths:
         try:
-            temp_df = pd.read_csv(
-                file_path,
-                encoding="utf-8-sig"
-            )
-
-            temp_df.columns = (
-                temp_df.columns
-                .str.strip()
-            )
-
-            # 필요한 열이 모두 존재하면 해당 파일 사용
-            if all(
-                col in temp_df.columns
-                for col in FEATURES + [TARGET]
-            ):
-                return file_path
-
+            for encoding in ["utf-8", "utf-8-sig", "cp949", "latin1"]:
+                try:
+                    raw_data = pd.read_csv(path, encoding=encoding)
+                    standardized = standardize_columns(raw_data)
+                    if len(standardized) > 0:
+                        return standardized, path.name
+                except (UnicodeDecodeError, ValueError, pd.errors.ParserError):
+                    continue
         except Exception:
             continue
 
-    return None
+    raise FileNotFoundError(
+        "No suitable Iris CSV file was found. "
+        "Place iris.csv in the same folder as app.py or in a data folder."
+    )
 
 
 @st.cache_data
-def load_data(file_path):
-
-    df = pd.read_csv(
-        file_path,
-        encoding="utf-8-sig"
-    )
-
-    # 열 이름의 공백 제거
-    df.columns = df.columns.str.strip()
-
-    return df
+def load_dataset():
+    return find_iris_csv()
 
 
-# CSV 파일 검색
-csv_path = find_iris_csv()
-
-if csv_path is None:
-
-    st.error(
-        "붓꽃 데이터 CSV 파일을 찾을 수 없습니다."
-    )
-
-    st.info(
-        "GitHub 저장소에 Iris CSV 파일을 업로드해주세요. "
-        "파일 이름은 Iris (1).csv 또는 iris.csv 등 "
-        "어떤 이름이어도 괜찮습니다."
-    )
-
-    st.write("현재 검색한 폴더:")
-
-    st.code(
-        "\n".join([
-            str(Path(__file__).resolve().parent),
-            str(Path(__file__).resolve().parent.parent),
-            str(Path.cwd())
-        ])
-    )
-
-    st.stop()
-
-
-# CSV 파일 불러오기
 try:
-
-    df = load_data(str(csv_path))
-
-except Exception as e:
-
-    st.error(
-        f"CSV 파일을 불러오는 중 오류가 발생했습니다: {e}"
+    df, dataset_filename = load_dataset()
+except FileNotFoundError as error:
+    st.error(str(error))
+    st.info(
+        "Upload your Iris CSV to the same folder as app.py, "
+        "or place it in a folder named data."
     )
-
     st.stop()
 
 
-# ==========================================
-# 3. 데이터 전처리
-# ==========================================
-
-# 필요한 열만 사용
-df = df[FEATURES + [TARGET]].copy()
-
-# 숫자형 데이터로 변환
-for col in FEATURES:
-
-    df[col] = pd.to_numeric(
-        df[col],
-        errors="coerce"
-    )
-
-# 결측치 제거
-df = df.dropna(
-    subset=FEATURES + [TARGET]
-)
-
-# 데이터가 비어 있는지 확인
-if df.empty:
-
-    st.error(
-        "분석할 데이터가 없습니다. CSV 파일을 확인해주세요."
-    )
-
-    st.stop()
-
-
-# 입력값의 최소값과 최대값
-min_values = df[FEATURES].min()
-max_values = df[FEATURES].max()
-
-# 품종별 데이터 확인
-species_list = sorted(
-    df[TARGET].unique()
-)
-
-# 데이터 정보
-st.caption(
-    f"분석 데이터: {len(df)}개 / "
-    f"품종: {len(species_list)}종"
-)
-
-
-# ==========================================
-# 4. 랜덤 포레스트 모델 학습
-# ==========================================
-
+# --------------------------------------------------
+# Train model
+# --------------------------------------------------
 X = df[FEATURES]
 y = df[TARGET]
 
 model = RandomForestClassifier(
-    n_estimators=200,
-    random_state=42
+    n_estimators=250,
+    random_state=42,
+    class_weight="balanced",
 )
 
 model.fit(X, y)
 
+species_list = sorted(y.unique().tolist())
 
-# ==========================================
-# 5. 데이터 입력 범위 안내
-# ==========================================
 
-st.subheader("📊 데이터 입력 범위")
+# --------------------------------------------------
+# English labels for charts and prediction results
+# --------------------------------------------------
+def get_english_species_label(species, index=0):
+    """
+    Return an English display label.
+    This prevents Korean text in CSV species names from appearing in charts.
+    """
+    value = str(species).strip().lower()
 
-st.write(
-    "아래는 업로드한 붓꽃 데이터에 실제로 포함된 "
-    "각 항목의 최솟값과 최댓값입니다."
+    english_names = {
+        "iris-setosa": "Setosa",
+        "setosa": "Setosa",
+        "iris-versicolor": "Versicolor",
+        "versicolor": "Versicolor",
+        "iris-virginica": "Virginica",
+        "virginica": "Virginica",
+    }
+
+    if value in english_names:
+        return english_names[value]
+
+    return f"Class {index + 1}"
+
+
+species_display_names = {
+    species: get_english_species_label(species, index)
+    for index, species in enumerate(species_list)
+}
+
+
+# --------------------------------------------------
+# Header
+# --------------------------------------------------
+st.markdown(
+    '<div class="main-title">Iris Species Predictor</div>',
+    unsafe_allow_html=True,
 )
 
-range_df = pd.DataFrame({
+st.markdown(
+    """
+    <div class="main-subtitle">
+        Predict an Iris flower species using four measurements.
+        Explore the dataset and compare your input with the original samples.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-    "항목": [
-        "꽃받침 길이",
-        "꽃받침 너비",
-        "꽃잎 길이",
-        "꽃잎 너비"
-    ],
 
-    "최솟값(cm)": [
-        min_values[col]
-        for col in FEATURES
-    ],
+# --------------------------------------------------
+# Sidebar: input measurements
+# --------------------------------------------------
+st.sidebar.markdown("## Flower Measurements")
+st.sidebar.caption("Adjust the four measurements below.")
 
-    "최댓값(cm)": [
-        max_values[col]
-        for col in FEATURES
-    ]
+input_values = {}
 
-})
+for feature in FEATURES:
+    minimum = float(df[feature].min())
+    maximum = float(df[feature].max())
 
-st.dataframe(
-    range_df.round(2),
-    use_container_width=True,
-    hide_index=True
+    # Add a small margin so the slider is not restricted to the dataset range.
+    margin = max((maximum - minimum) * 0.05, 0.1)
+    slider_min = max(0.0, minimum - margin)
+    slider_max = maximum + margin
+
+    default_value = float(df[feature].median())
+
+    input_values[feature] = st.sidebar.slider(
+        FEATURE_LABELS[feature],
+        min_value=float(slider_min),
+        max_value=float(slider_max),
+        value=float(default_value),
+        step=0.1,
+    )
+
+predict_button = st.sidebar.button(
+    "Predict Species",
+    type="primary",
+)
+
+
+# --------------------------------------------------
+# Prediction
+# --------------------------------------------------
+input_df = pd.DataFrame([input_values], columns=FEATURES)
+
+prediction = model.predict(input_df)[0]
+probabilities = model.predict_proba(input_df)[0]
+
+predicted_index = species_list.index(prediction)
+predicted_label = species_display_names[prediction]
+confidence = float(probabilities[predicted_index]) * 100
+
+
+# --------------------------------------------------
+# Prediction summary
+# --------------------------------------------------
+st.markdown(
+    '<div class="section-label">Prediction Result</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '<div class="section-title">Predicted flower species</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '<div class="section-description">'
+    'The model uses a Random Forest classifier trained on the loaded Iris dataset.'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+metric_col1, metric_col2, metric_col3 = st.columns(3)
+
+with metric_col1:
+    st.metric("Predicted Species", predicted_label)
+
+with metric_col2:
+    st.metric("Model Confidence", f"{confidence:.1f}%")
+
+with metric_col3:
+    st.metric("Dataset Samples", f"{len(df):,}")
+
+
+# --------------------------------------------------
+# Input summary
+# --------------------------------------------------
+st.markdown("### Your Measurements")
+
+measurement_columns = st.columns(4)
+
+for column, feature in zip(measurement_columns, FEATURES):
+    with column:
+        st.metric(
+            FEATURE_LABELS[feature],
+            f"{input_values[feature]:.1f}",
+        )
+
+
+# --------------------------------------------------
+# Probability chart
+# --------------------------------------------------
+st.markdown("---")
+
+st.markdown(
+    '<div class="section-label">Model Analysis</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '<div class="section-title">Prediction probabilities</div>',
+    unsafe_allow_html=True,
+)
+
+probability_data = pd.DataFrame(
+    {
+        "Species": [
+            species_display_names[species]
+            for species in model.classes_
+        ],
+        "Probability": probabilities * 100,
+    }
+).sort_values("Probability", ascending=False)
+
+st.bar_chart(
+    probability_data.set_index("Species"),
+    y="Probability",
+    color="#818cf8",
 )
 
 st.caption(
-    "입력값은 위 범위 안에서 선택할 수 있습니다. "
-    "범위 밖의 값은 입력할 수 없습니다."
+    "Probabilities show how strongly the model associates the measurements "
+    "with each species. They are not a guarantee of the actual species."
 )
 
 
-# ==========================================
-# 6. 사용자 입력
-# ==========================================
+# --------------------------------------------------
+# English-only graph
+# --------------------------------------------------
+st.markdown("---")
 
-st.subheader("✏️ 붓꽃 크기 입력")
-
-col1, col2 = st.columns(2)
-
-with col1:
-
-    st.markdown("#### 꽃받침")
-
-    sepal_length = st.number_input(
-        "꽃받침 길이 (cm)",
-        min_value=float(min_values["SepalLengthCm"]),
-        max_value=float(max_values["SepalLengthCm"]),
-        value=float(df["SepalLengthCm"].median()),
-        step=0.1,
-        format="%.2f"
-    )
-
-    sepal_width = st.number_input(
-        "꽃받침 너비 (cm)",
-        min_value=float(min_values["SepalWidthCm"]),
-        max_value=float(max_values["SepalWidthCm"]),
-        value=float(df["SepalWidthCm"].median()),
-        step=0.1,
-        format="%.2f"
-    )
-
-
-with col2:
-
-    st.markdown("#### 꽃잎")
-
-    petal_length = st.number_input(
-        "꽃잎 길이 (cm)",
-        min_value=float(min_values["PetalLengthCm"]),
-        max_value=float(max_values["PetalLengthCm"]),
-        value=float(df["PetalLengthCm"].median()),
-        step=0.1,
-        format="%.2f"
-    )
-
-    petal_width = st.number_input(
-        "꽃잎 너비 (cm)",
-        min_value=float(min_values["PetalWidthCm"]),
-        max_value=float(max_values["PetalWidthCm"]),
-        value=float(df["PetalWidthCm"].median()),
-        step=0.1,
-        format="%.2f"
-    )
-
-
-# ==========================================
-# 7. 품종 예측
-# ==========================================
-
-input_data = pd.DataFrame(
-    [[
-        sepal_length,
-        sepal_width,
-        petal_length,
-        petal_width
-    ]],
-    columns=FEATURES
+st.markdown(
+    '<div class="section-label">Data Visualization</div>',
+    unsafe_allow_html=True,
 )
 
-# 품종 예측
-prediction = model.predict(input_data)[0]
-
-# 품종별 예측 확률
-probabilities = model.predict_proba(input_data)[0]
-
-# 가장 높은 예측 확률
-confidence = max(probabilities) * 100
-
-
-# ==========================================
-# 8. 예측 결과 표시
-# ==========================================
-
-st.divider()
-
-st.subheader("🔍 예측 결과")
-
-result_col1, result_col2 = st.columns(2)
-
-with result_col1:
-
-    st.success(
-        f"예측된 품종: {prediction}"
-    )
-
-    st.metric(
-        label="모델의 예측 확률",
-        value=f"{confidence:.1f}%"
-    )
-
-
-with result_col2:
-
-    st.markdown("#### 품종별 예측 확률")
-
-    probability_df = pd.DataFrame({
-
-        "품종": model.classes_,
-
-        "예측 확률(%)": probabilities * 100
-
-    })
-
-    probability_df = probability_df.sort_values(
-        "예측 확률(%)",
-        ascending=False
-    )
-
-    st.dataframe(
-        probability_df.round(2),
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-st.caption(
-    "예측 확률은 모델의 판단을 나타내며, "
-    "실제 품종일 확률을 보장하지는 않습니다."
+st.markdown(
+    '<div class="section-title">Petal measurement map</div>',
+    unsafe_allow_html=True,
 )
 
-
-# ==========================================
-# 9. 꽃잎 길이와 너비 그래프
-# ==========================================
-
-st.subheader("📈 꽃잎 크기 분포")
-
-st.write(
-    "가로축은 꽃잎 길이, 세로축은 꽃잎 너비입니다. "
-    "빨간색 별표는 사용자가 입력한 꽃잎의 위치입니다."
+st.markdown(
+    '<div class="section-description">'
+    'Compare your flower with the original dataset. '
+    'The red star marks your selected measurements.'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
-fig, ax = plt.subplots(
-    figsize=(9, 6)
-)
+# Use an English font and English-only text in the graph.
+plt.rcParams["font.family"] = "DejaVu Sans"
+plt.rcParams["axes.unicode_minus"] = False
 
-# 품종별 데이터 표시
-for species in species_list:
+fig, ax = plt.subplots(figsize=(10, 6))
+fig.patch.set_facecolor("#111827")
+ax.set_facecolor("#111827")
 
-    species_data = df[
-        df[TARGET] == species
-    ]
+colors = ["#818cf8", "#34d399", "#fbbf24"]
+
+for index, species in enumerate(species_list):
+    species_data = df[df[TARGET] == species]
+
+    # Use the English display name instead of the original CSV label.
+    english_label = species_display_names[species]
 
     ax.scatter(
         species_data["PetalLengthCm"],
         species_data["PetalWidthCm"],
-        label=species,
-        alpha=0.7,
-        s=55
+        label=english_label,
+        color=colors[index % len(colors)],
+        s=65,
+        alpha=0.8,
+        edgecolors="none",
     )
 
-
-# 사용자가 입력한 위치 표시
 ax.scatter(
-    petal_length,
-    petal_width,
+    input_values["PetalLengthCm"],
+    input_values["PetalWidthCm"],
     marker="*",
-    s=350,
-    color="red",
-    edgecolors="black",
-    linewidths=1.2,
+    s=450,
+    color="#f87171",
+    edgecolors="white",
+    linewidths=1.5,
     label="Your Input",
-    zorder=5
+    zorder=10,
 )
 
-
-# 입력 위치에 값 표시
 ax.annotate(
-    f"입력값\n({petal_length:.2f}, {petal_width:.2f})",
-    xy=(petal_length, petal_width),
-    xytext=(10, 10),
+    (
+        "Your Input\n"
+        f"({input_values['PetalLengthCm']:.2f}, "
+        f"{input_values['PetalWidthCm']:.2f})"
+    ),
+    (
+        input_values["PetalLengthCm"],
+        input_values["PetalWidthCm"],
+    ),
+    xytext=(12, 12),
     textcoords="offset points",
+    color="white",
     fontsize=10,
-    color="red"
+    fontweight="bold",
 )
 
+ax.set_xlabel(
+    "Petal Length (cm)",
+    color="#e5e7eb",
+    fontsize=11,
+)
 
-# 그래프 제목과 축 설정
-ax.set_xlabel("Petal Length (cm)")
-ax.set_ylabel("Petal Width (cm)")
+ax.set_ylabel(
+    "Petal Width (cm)",
+    color="#e5e7eb",
+    fontsize=11,
+)
 
 ax.set_title(
-    "Iris Petal Length and Width"
+    "Iris Petal Distribution",
+    color="#f9fafb",
+    fontsize=15,
+    fontweight="bold",
+    pad=15,
 )
 
-ax.legend()
-ax.grid(alpha=0.3)
+ax.tick_params(colors="#d1d5db")
+ax.grid(color="#374151", alpha=0.45, linestyle="--")
 
-st.pyplot(fig)
+for spine in ax.spines.values():
+    spine.set_color("#4b5563")
 
+legend = ax.legend(
+    facecolor="#1f2937",
+    edgecolor="#374151",
+    labelcolor="white",
+)
+
+for text in legend.get_texts():
+    text.set_fontsize(10)
+
+fig.tight_layout()
+st.pyplot(fig, use_container_width=True)
 plt.close(fig)
 
 
-# ==========================================
-# 10. 입력 데이터 확인
-# ==========================================
+# --------------------------------------------------
+# Feature importance
+# --------------------------------------------------
+st.markdown("---")
 
-with st.expander("입력한 데이터 확인하기"):
+st.markdown(
+    '<div class="section-title">Feature importance</div>',
+    unsafe_allow_html=True,
+)
 
+st.markdown(
+    '<div class="section-description">'
+    'This chart shows how much each measurement contributed to the trained model.'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+importance_data = pd.DataFrame(
+    {
+        "Feature": [FEATURE_LABELS[feature] for feature in FEATURES],
+        "Importance": model.feature_importances_,
+    }
+).sort_values("Importance", ascending=False)
+
+st.bar_chart(
+    importance_data.set_index("Feature"),
+    y="Importance",
+    color="#34d399",
+)
+
+
+# --------------------------------------------------
+# Dataset preview
+# --------------------------------------------------
+with st.expander("View dataset preview"):
+    st.caption(f"Loaded file: {dataset_filename}")
+    st.dataframe(df.head(20), use_container_width=True)
+
+    st.caption("Dataset summary")
     st.dataframe(
-        input_data,
+        df[FEATURES].describe().round(2),
         use_container_width=True,
-        hide_index=True
     )
