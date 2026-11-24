@@ -13,67 +13,58 @@ from sklearn.neighbors import KNeighborsClassifier
 
 
 # --------------------------------------------------
-# Page settings and style
+# 페이지 설정
 # --------------------------------------------------
 st.set_page_config(
-    page_title="Iris Species Predictor",
+    page_title="붓꽃 품종 예측",
     page_icon="🌸",
     layout="wide",
 )
 
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-color: #0b1120;
-        color: #f3f4f6;
-    }
-    .main-title {
-        font-size: 2.4rem;
-        font-weight: 800;
-        color: #f9fafb;
-        margin-bottom: 0.2rem;
-    }
-    .subtitle {
-        color: #9ca3af;
-        margin-bottom: 1.5rem;
-    }
-    div[data-testid="stMetric"] {
-        background: #111827;
-        border: 1px solid #263244;
-        padding: 1rem;
-        border-radius: 12px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
+st.title("🌸 붓꽃 품종 예측 프로그램")
+st.write(
+    "꽃받침과 꽃잎의 길이·너비를 입력하면 "
+    "세 가지 분류 알고리즘으로 붓꽃 품종을 예측합니다."
 )
 
 
 # --------------------------------------------------
-# Load Iris dataset
+# 데이터 불러오기
 # --------------------------------------------------
 iris = load_iris()
 
+feature_names = [
+    "꽃받침 길이",
+    "꽃받침 너비",
+    "꽃잎 길이",
+    "꽃잎 너비",
+]
+
+# 데이터셋의 실제 열 이름
 X = pd.DataFrame(
     iris.data,
-    columns=[
-        "Sepal Length",
-        "Sepal Width",
-        "Petal Length",
-        "Petal Width",
-    ],
+    columns=feature_names,
 )
 
 y = iris.target
-species_names = iris.target_names
 
-# English-only names for chart labels
-chart_species_names = ["Setosa", "Versicolor", "Virginica"]
+# 그래프에 사용할 영어 품종명
+english_species_names = [
+    "Setosa",
+    "Versicolor",
+    "Virginica",
+]
+
+# 화면에 표시할 한국어 품종명
+korean_species_names = [
+    "세토사",
+    "버시컬러",
+    "버지니카",
+]
 
 
 # --------------------------------------------------
-# Train/test split for model accuracy comparison
+# 학습 데이터와 테스트 데이터 분리
 # --------------------------------------------------
 X_train, X_test, y_train, y_test = train_test_split(
     X,
@@ -85,14 +76,15 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 
 # --------------------------------------------------
-# Three classification algorithms
+# 세 가지 분류 알고리즘
 # --------------------------------------------------
 models = {
-    "Random Forest": RandomForestClassifier(
+    "랜덤 포레스트": RandomForestClassifier(
         n_estimators=200,
         random_state=42,
     ),
-    "Support Vector Machine (SVM)": make_pipeline(
+
+    "서포트 벡터 머신(SVM)": make_pipeline(
         StandardScaler(),
         SVC(
             kernel="rbf",
@@ -100,69 +92,62 @@ models = {
             random_state=42,
         ),
     ),
-    "K-Nearest Neighbors (KNN)": make_pipeline(
+
+    "K-최근접 이웃(KNN)": make_pipeline(
         StandardScaler(),
         KNeighborsClassifier(n_neighbors=5),
     ),
 }
 
-# Train each model and calculate test accuracy
+
+# --------------------------------------------------
+# 모델 학습 및 정확도 계산
+# --------------------------------------------------
 test_accuracies = {}
 
 for model_name, model in models.items():
     model.fit(X_train, y_train)
-    test_prediction = model.predict(X_test)
+
+    test_predictions = model.predict(X_test)
+
     test_accuracies[model_name] = accuracy_score(
         y_test,
-        test_prediction,
+        test_predictions,
     )
 
 
 # --------------------------------------------------
-# Header
+# 입력 범위 안내
 # --------------------------------------------------
-st.markdown(
-    '<div class="main-title">Iris Species Predictor</div>',
-    unsafe_allow_html=True,
+st.subheader("1. 꽃의 측정값 입력")
+
+st.info(
+    "입력 범위는 붓꽃 데이터셋에 포함된 각 측정값의 "
+    "최솟값과 최댓값을 기준으로 설정했습니다. 단위는 cm입니다."
 )
 
-st.markdown(
-    """
-    <div class="subtitle">
-    Enter four flower measurements and compare predictions from three
-    classification algorithms.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+range_col1, range_col2, range_col3, range_col4 = st.columns(4)
+
+with range_col1:
+    st.metric("꽃받침 길이", "4.3 ~ 7.9 cm")
+
+with range_col2:
+    st.metric("꽃받침 너비", "2.0 ~ 4.4 cm")
+
+with range_col3:
+    st.metric("꽃잎 길이", "1.0 ~ 6.9 cm")
+
+with range_col4:
+    st.metric("꽃잎 너비", "0.1 ~ 2.5 cm")
 
 
 # --------------------------------------------------
-# Input controls
+# 사용자 입력
 # --------------------------------------------------
-st.sidebar.header("Flower Measurements")
-st.sidebar.caption(
-    "The input ranges are based on the minimum and maximum values "
-    "in the Iris dataset."
-)
-
-measurement_ranges = {
-    "Sepal Length": (4.3, 7.9),
-    "Sepal Width": (2.0, 4.4),
-    "Petal Length": (1.0, 6.9),
-    "Petal Width": (0.1, 2.5),
-}
-
-st.sidebar.markdown("**Input ranges**")
-for feature, (minimum, maximum) in measurement_ranges.items():
-    st.sidebar.write(
-        f"{feature}: {minimum}–{maximum} cm"
-    )
-
-st.sidebar.divider()
+st.sidebar.header("꽃의 측정값")
 
 sepal_length = st.sidebar.slider(
-    "Sepal Length (cm)",
+    "꽃받침 길이 (cm)",
     min_value=4.3,
     max_value=7.9,
     value=5.8,
@@ -170,7 +155,7 @@ sepal_length = st.sidebar.slider(
 )
 
 sepal_width = st.sidebar.slider(
-    "Sepal Width (cm)",
+    "꽃받침 너비 (cm)",
     min_value=2.0,
     max_value=4.4,
     value=3.0,
@@ -178,7 +163,7 @@ sepal_width = st.sidebar.slider(
 )
 
 petal_length = st.sidebar.slider(
-    "Petal Length (cm)",
+    "꽃잎 길이 (cm)",
     min_value=1.0,
     max_value=6.9,
     value=4.0,
@@ -186,7 +171,7 @@ petal_length = st.sidebar.slider(
 )
 
 petal_width = st.sidebar.slider(
-    "Petal Width (cm)",
+    "꽃잎 너비 (cm)",
     min_value=0.1,
     max_value=2.5,
     value=1.2,
@@ -195,39 +180,40 @@ petal_width = st.sidebar.slider(
 
 input_data = pd.DataFrame(
     [[sepal_length, sepal_width, petal_length, petal_width]],
-    columns=X.columns,
+    columns=feature_names,
 )
 
 
 # --------------------------------------------------
-# Predict with all three algorithms
+# 세 모델의 예측 결과
 # --------------------------------------------------
-st.subheader("Prediction Comparison")
+st.divider()
+st.subheader("2. 알고리즘별 예측 결과")
 
 results = []
 
 for model_name, model in models.items():
     predicted_class = int(model.predict(input_data)[0])
+
     probabilities = model.predict_proba(input_data)[0]
     confidence = float(probabilities[predicted_class]) * 100
 
     results.append(
         {
-            "Algorithm": model_name,
-            "Predicted Species": species_names[predicted_class].title(),
-            "Confidence": confidence,
-            "Test Accuracy": test_accuracies[model_name] * 100,
+            "알고리즘": model_name,
+            "예측 품종": korean_species_names[predicted_class],
+            "예측 확률": confidence,
+            "테스트 정확도": test_accuracies[model_name] * 100,
         }
     )
 
 results_df = pd.DataFrame(results)
 
-# Display results in a table
 display_results = results_df.copy()
-display_results["Confidence"] = display_results["Confidence"].map(
+display_results["예측 확률"] = display_results["예측 확률"].map(
     lambda value: f"{value:.1f}%"
 )
-display_results["Test Accuracy"] = display_results["Test Accuracy"].map(
+display_results["테스트 정확도"] = display_results["테스트 정확도"].map(
     lambda value: f"{value:.1f}%"
 )
 
@@ -237,100 +223,125 @@ st.dataframe(
     use_container_width=True,
 )
 
-# Highlight each model's prediction
-metric_columns = st.columns(3)
+# 대표 모델: 랜덤 포레스트
+main_model = models["랜덤 포레스트"]
+main_prediction = int(main_model.predict(input_data)[0])
+main_probability = main_model.predict_proba(input_data)[0][main_prediction] * 100
 
-for column, result in zip(metric_columns, results):
-    with column:
-        st.metric(
-            label=result["Algorithm"],
-            value=result["Predicted Species"],
-            delta=f"Confidence: {result['Confidence']:.1f}%",
-        )
-
-
-# --------------------------------------------------
-# Graphs: length on X-axis, width on Y-axis
-# --------------------------------------------------
-st.divider()
-st.subheader("Measurement Maps")
-st.caption(
-    "The colored dots show the Iris dataset. "
-    "The red star shows your entered measurements."
+st.success(
+    f"대표 모델인 랜덤 포레스트의 예측 품종은 "
+    f"**{korean_species_names[main_prediction]}**입니다. "
+    f"예측 확률은 **{main_probability:.1f}%**입니다."
 )
 
-# English labels and font are used inside the charts.
+
+# --------------------------------------------------
+# 입력값 표시
+# --------------------------------------------------
+st.subheader("입력한 측정값")
+
+input_col1, input_col2, input_col3, input_col4 = st.columns(4)
+
+with input_col1:
+    st.metric("꽃받침 길이", f"{sepal_length:.1f} cm")
+
+with input_col2:
+    st.metric("꽃받침 너비", f"{sepal_width:.1f} cm")
+
+with input_col3:
+    st.metric("꽃잎 길이", f"{petal_length:.1f} cm")
+
+with input_col4:
+    st.metric("꽃잎 너비", f"{petal_width:.1f} cm")
+
+
+# --------------------------------------------------
+# 산점도
+# X축은 길이, Y축은 너비
+# 그래프 안의 문구는 영어로 표시하여 한글 깨짐 방지
+# --------------------------------------------------
+st.divider()
+st.subheader("3. 입력값의 위치 확인")
+st.write(
+    "색깔별 점은 기존 붓꽃 데이터이고, "
+    "빨간 별표는 사용자가 입력한 측정값입니다."
+)
+
 plt.rcParams["font.family"] = "DejaVu Sans"
 plt.rcParams["axes.unicode_minus"] = False
 
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 fig.patch.set_facecolor("#111827")
 
-chart_settings = [
-    {
-        "ax": axes[0],
-        "x_column": "Petal Length",
-        "y_column": "Petal Width",
-        "x_value": petal_length,
-        "y_value": petal_width,
-        "title": "Petal Length vs. Petal Width",
-    },
-    {
-        "ax": axes[1],
-        "x_column": "Sepal Length",
-        "y_column": "Sepal Width",
-        "x_value": sepal_length,
-        "y_value": sepal_width,
-        "title": "Sepal Length vs. Sepal Width",
-    },
-]
+# 꽃잎 길이와 너비
+petal_ax = axes[0]
+petal_ax.set_facecolor("#111827")
+
+# 꽃받침 길이와 너비
+sepal_ax = axes[1]
+sepal_ax.set_facecolor("#111827")
 
 colors = ["#818cf8", "#34d399", "#fbbf24"]
 
-for settings in chart_settings:
-    ax = settings["ax"]
-    ax.set_facecolor("#111827")
+for class_index, species_name in enumerate(english_species_names):
+    class_data = X[y == class_index]
 
-    for class_index, species_name in enumerate(chart_species_names):
-        class_data = X[y == class_index]
-
-        ax.scatter(
-            class_data[settings["x_column"]],
-            class_data[settings["y_column"]],
-            label=species_name,
-            color=colors[class_index],
-            s=55,
-            alpha=0.8,
-            edgecolors="none",
-        )
-
-    ax.scatter(
-        settings["x_value"],
-        settings["y_value"],
-        marker="*",
-        s=380,
-        color="#f87171",
-        edgecolors="white",
-        linewidths=1.2,
-        label="Your Input",
-        zorder=10,
+    petal_ax.scatter(
+        class_data["꽃잎 길이"],
+        class_data["꽃잎 너비"],
+        label=species_name,
+        color=colors[class_index],
+        s=55,
+        alpha=0.8,
+        edgecolors="none",
     )
 
-    ax.set_title(
-        settings["title"],
-        color="#f9fafb",
-        fontsize=12,
-        fontweight="bold",
-    )
-    ax.set_xlabel(
-        f"{settings['x_column']} (cm)",
-        color="#e5e7eb",
-    )
-    ax.set_ylabel(
-        f"{settings['y_column']} (cm)",
-        color="#e5e7eb",
+    sepal_ax.scatter(
+        class_data["꽃받침 길이"],
+        class_data["꽃받침 너비"],
+        label=species_name,
+        color=colors[class_index],
+        s=55,
+        alpha=0.8,
+        edgecolors="none",
     )
 
+# 사용자가 입력한 꽃잎 측정값
+petal_ax.scatter(
+    petal_length,
+    petal_width,
+    marker="*",
+    s=380,
+    color="#f87171",
+    edgecolors="white",
+    linewidths=1.2,
+    label="Your Input",
+    zorder=10,
+)
+
+# 사용자가 입력한 꽃받침 측정값
+sepal_ax.scatter(
+    sepal_length,
+    sepal_width,
+    marker="*",
+    s=380,
+    color="#f87171",
+    edgecolors="white",
+    linewidths=1.2,
+    label="Your Input",
+    zorder=10,
+)
+
+# 그래프 제목과 축 이름은 영어로 표시
+petal_ax.set_title("Petal Length vs. Petal Width", color="white")
+petal_ax.set_xlabel("Petal Length (cm)", color="white")
+petal_ax.set_ylabel("Petal Width (cm)", color="white")
+
+sepal_ax.set_title("Sepal Length vs. Sepal Width", color="white")
+sepal_ax.set_xlabel("Sepal Length (cm)", color="white")
+sepal_ax.set_ylabel("Sepal Width (cm)", color="white")
+
+for ax in axes:
     ax.tick_params(colors="#d1d5db")
     ax.grid(color="#374151", alpha=0.4, linestyle="--")
 
@@ -352,65 +363,56 @@ plt.close(fig)
 
 
 # --------------------------------------------------
-# Algorithm explanations
+# 알고리즘 작동 원리
 # --------------------------------------------------
 st.divider()
-st.subheader("How the Algorithms Work")
+st.subheader("4. 분류 알고리즘의 작동 원리")
 
-with st.expander("1. Random Forest"):
+with st.expander("랜덤 포레스트"):
     st.write(
         """
-        Random Forest creates many decision trees using different samples
-        and feature combinations from the training data.
+        여러 개의 의사결정나무를 만들어 각각 품종을 예측하게 합니다.
+        각 나무의 예측 결과를 모아 가장 많은 표를 받은 품종을 최종 결과로 선택합니다.
 
-        Each tree predicts a species. The model combines the trees' votes
-        and chooses the species with the most votes.
-
-        **Strength:** Often performs well on varied data and can model
-        complex relationships.
+        **쉽게 말하면:** 여러 판단 기준의 결과를 모아 다수결로 결정하는 방식입니다.
         """
     )
 
-with st.expander("2. Support Vector Machine (SVM)"):
+with st.expander("서포트 벡터 머신(SVM)"):
     st.write(
         """
-        SVM searches for a boundary that separates the species while
-        keeping the margin between classes as wide as possible.
+        품종별 데이터가 서로 잘 구분되도록 데이터 사이에 경계선을 찾습니다.
+        이 프로그램은 직선으로 구분하기 어려운 경우에도 사용할 수 있는
+        RBF 커널을 사용합니다.
 
-        This app uses an RBF kernel, which can create curved boundaries
-        when the classes cannot be separated well by a straight line.
-
-        **Strength:** Effective for datasets with clear class boundaries.
+        **쉽게 말하면:** 측정값을 기준으로 품종 사이의 경계선을 찾는 방식입니다.
         """
     )
 
-with st.expander("3. K-Nearest Neighbors (KNN)"):
+with st.expander("K-최근접 이웃(KNN)"):
     st.write(
         """
-        KNN finds the five training flowers closest to the input flower
-        and predicts the species that appears most often among those
-        neighbors.
+        입력한 꽃과 측정값이 가장 가까운 기존 꽃 5개를 찾습니다.
+        그 5개 중 가장 많이 나타난 품종을 예측 결과로 선택합니다.
 
-        The measurements are standardized first so that features with
-        larger numerical values do not dominate the distance calculation.
-
-        **Strength:** Simple to understand and bases predictions on
-        nearby examples.
+        **쉽게 말하면:** 입력한 꽃과 비슷한 꽃들을 찾아 다수의 품종을 선택하는 방식입니다.
         """
     )
 
 
 # --------------------------------------------------
-# Dataset information
+# 정확도 비교 안내
 # --------------------------------------------------
-with st.expander("About the dataset"):
-    st.write(
-        """
-        The Iris dataset contains 150 flower samples from three species:
-        Setosa, Versicolor, and Virginica. Each sample has four measurements:
-        sepal length, sepal width, petal length, and petal width.
+st.divider()
+st.subheader("5. 결과 비교 시 참고할 점")
 
-        The displayed input ranges are the minimum and maximum values
-        found in this dataset.
-        """
-    )
+st.write(
+    """
+    - **예측 품종:** 각 알고리즘이 입력값을 보고 예측한 품종입니다.
+    - **예측 확률:** 해당 알고리즘이 예측 품종에 부여한 확률입니다.
+    - **테스트 정확도:** 학습에 사용하지 않은 테스트 데이터에서 맞힌 비율입니다.
+
+    테스트 정확도는 데이터를 나누는 방식과 알고리즘 설정에 따라 달라질 수 있습니다.
+    예측 확률이 높더라도 실제 품종을 반드시 맞힌다는 뜻은 아닙니다.
+    """
+)
