@@ -1,14 +1,19 @@
-import re
-from pathlib import Path
-
-import matplotlib.pyplot as plt
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
 
 
 # --------------------------------------------------
-# Page settings
+# Page settings and style
 # --------------------------------------------------
 st.set_page_config(
     page_title="Iris Species Predictor",
@@ -16,77 +21,28 @@ st.set_page_config(
     layout="wide",
 )
 
-
-# --------------------------------------------------
-# Styling
-# --------------------------------------------------
 st.markdown(
     """
     <style>
     .stApp {
-        background: #0b1120;
+        background-color: #0b1120;
         color: #f3f4f6;
     }
-
     .main-title {
-        font-size: 2.45rem;
+        font-size: 2.4rem;
         font-weight: 800;
-        letter-spacing: -1px;
         color: #f9fafb;
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.2rem;
     }
-
-    .main-subtitle {
+    .subtitle {
         color: #9ca3af;
-        font-size: 1rem;
-        margin-bottom: 1.8rem;
+        margin-bottom: 1.5rem;
     }
-
-    .section-label {
-        color: #818cf8;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        margin-bottom: 0.3rem;
-    }
-
-    .section-title {
-        color: #f9fafb;
-        font-size: 1.45rem;
-        font-weight: 750;
-        margin-bottom: 0.3rem;
-    }
-
-    .section-description {
-        color: #9ca3af;
-        font-size: 0.92rem;
-        margin-bottom: 1rem;
-    }
-
     div[data-testid="stMetric"] {
         background: #111827;
         border: 1px solid #263244;
         padding: 1rem;
-        border-radius: 14px;
-    }
-
-    div[data-testid="stMetricLabel"] {
-        color: #9ca3af;
-    }
-
-    div[data-testid="stMetricValue"] {
-        color: #f9fafb;
-    }
-
-    div[data-testid="stSidebar"] {
-        background: #111827;
-    }
-
-    .stButton > button {
-        width: 100%;
-        border-radius: 10px;
-        font-weight: 700;
+        border-radius: 12px;
     }
     </style>
     """,
@@ -95,192 +51,71 @@ st.markdown(
 
 
 # --------------------------------------------------
-# Dataset loading
+# Load Iris dataset
 # --------------------------------------------------
-FEATURES = [
-    "SepalLengthCm",
-    "SepalWidthCm",
-    "PetalLengthCm",
-    "PetalWidthCm",
-]
+iris = load_iris()
 
-FEATURE_LABELS = {
-    "SepalLengthCm": "Sepal Length (cm)",
-    "SepalWidthCm": "Sepal Width (cm)",
-    "PetalLengthCm": "Petal Length (cm)",
-    "PetalWidthCm": "Petal Width (cm)",
-}
-
-TARGET = "Species"
-
-
-def normalize_column_name(name):
-    """Remove spaces and symbols to make column matching easier."""
-    return re.sub(r"[^a-z0-9]", "", str(name).lower())
-
-
-def standardize_columns(dataframe):
-    """Convert common Iris CSV column names to standard names."""
-    aliases = {
-        "sepallengthcm": "SepalLengthCm",
-        "sepallength": "SepalLengthCm",
-        "sepal_length": "SepalLengthCm",
-        "sepalwidthcm": "SepalWidthCm",
-        "sepalwidth": "SepalWidthCm",
-        "sepal_width": "SepalWidthCm",
-        "petallengthcm": "PetalLengthCm",
-        "petallength": "PetalLengthCm",
-        "petal_length": "PetalLengthCm",
-        "petalwidthcm": "PetalWidthCm",
-        "petalwidth": "PetalWidthCm",
-        "petal_width": "PetalWidthCm",
-        "species": "Species",
-        "class": "Species",
-        "target": "Species",
-        "variety": "Species",
-    }
-
-    renamed = {}
-
-    for column in dataframe.columns:
-        normalized = normalize_column_name(column)
-        if normalized in aliases:
-            renamed[column] = aliases[normalized]
-
-    dataframe = dataframe.rename(columns=renamed)
-
-    missing = [column for column in FEATURES + [TARGET] if column not in dataframe.columns]
-    if missing:
-        raise ValueError(
-            "The CSV does not contain the required Iris columns: "
-            + ", ".join(missing)
-        )
-
-    dataframe = dataframe[FEATURES + [TARGET]].copy()
-
-    for column in FEATURES:
-        dataframe[column] = pd.to_numeric(dataframe[column], errors="coerce")
-
-    dataframe = dataframe.dropna(subset=FEATURES + [TARGET])
-    dataframe[TARGET] = dataframe[TARGET].astype(str)
-
-    return dataframe
-
-
-def find_iris_csv():
-    """Look for a suitable Iris CSV in common project folders."""
-    current_folder = Path.cwd()
-
-    search_folders = [
-        current_folder,
-        current_folder / "data",
-        current_folder.parent,
-        current_folder.parent / "data",
-    ]
-
-    preferred_names = [
-        "iris.csv",
-        "Iris.csv",
-        "iris (1).csv",
-        "Iris (1).csv",
-    ]
-
-    checked_paths = []
-
-    for folder in search_folders:
-        if not folder.exists():
-            continue
-
-        for filename in preferred_names:
-            path = folder / filename
-            if path.exists() and path not in checked_paths:
-                checked_paths.append(path)
-
-        for path in folder.glob("*.csv"):
-            if path not in checked_paths:
-                checked_paths.append(path)
-
-    for path in checked_paths:
-        try:
-            for encoding in ["utf-8", "utf-8-sig", "cp949", "latin1"]:
-                try:
-                    raw_data = pd.read_csv(path, encoding=encoding)
-                    standardized = standardize_columns(raw_data)
-                    if len(standardized) > 0:
-                        return standardized, path.name
-                except (UnicodeDecodeError, ValueError, pd.errors.ParserError):
-                    continue
-        except Exception:
-            continue
-
-    raise FileNotFoundError(
-        "No suitable Iris CSV file was found. "
-        "Place iris.csv in the same folder as app.py or in a data folder."
-    )
-
-
-@st.cache_data
-def load_dataset():
-    return find_iris_csv()
-
-
-try:
-    df, dataset_filename = load_dataset()
-except FileNotFoundError as error:
-    st.error(str(error))
-    st.info(
-        "Upload your Iris CSV to the same folder as app.py, "
-        "or place it in a folder named data."
-    )
-    st.stop()
-
-
-# --------------------------------------------------
-# Train model
-# --------------------------------------------------
-X = df[FEATURES]
-y = df[TARGET]
-
-model = RandomForestClassifier(
-    n_estimators=250,
-    random_state=42,
-    class_weight="balanced",
+X = pd.DataFrame(
+    iris.data,
+    columns=[
+        "Sepal Length",
+        "Sepal Width",
+        "Petal Length",
+        "Petal Width",
+    ],
 )
 
-model.fit(X, y)
+y = iris.target
+species_names = iris.target_names
 
-species_list = sorted(y.unique().tolist())
+# English-only names for chart labels
+chart_species_names = ["Setosa", "Versicolor", "Virginica"]
 
 
 # --------------------------------------------------
-# English labels for charts and prediction results
+# Train/test split for model accuracy comparison
 # --------------------------------------------------
-def get_english_species_label(species, index=0):
-    """
-    Return an English display label.
-    This prevents Korean text in CSV species names from appearing in charts.
-    """
-    value = str(species).strip().lower()
-
-    english_names = {
-        "iris-setosa": "Setosa",
-        "setosa": "Setosa",
-        "iris-versicolor": "Versicolor",
-        "versicolor": "Versicolor",
-        "iris-virginica": "Virginica",
-        "virginica": "Virginica",
-    }
-
-    if value in english_names:
-        return english_names[value]
-
-    return f"Class {index + 1}"
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y,
+)
 
 
-species_display_names = {
-    species: get_english_species_label(species, index)
-    for index, species in enumerate(species_list)
+# --------------------------------------------------
+# Three classification algorithms
+# --------------------------------------------------
+models = {
+    "Random Forest": RandomForestClassifier(
+        n_estimators=200,
+        random_state=42,
+    ),
+    "Support Vector Machine (SVM)": make_pipeline(
+        StandardScaler(),
+        SVC(
+            kernel="rbf",
+            probability=True,
+            random_state=42,
+        ),
+    ),
+    "K-Nearest Neighbors (KNN)": make_pipeline(
+        StandardScaler(),
+        KNeighborsClassifier(n_neighbors=5),
+    ),
 }
+
+# Train each model and calculate test accuracy
+test_accuracies = {}
+
+for model_name, model in models.items():
+    model.fit(X_train, y_train)
+    test_prediction = model.predict(X_test)
+    test_accuracies[model_name] = accuracy_score(
+        y_test,
+        test_prediction,
+    )
 
 
 # --------------------------------------------------
@@ -293,9 +128,9 @@ st.markdown(
 
 st.markdown(
     """
-    <div class="main-subtitle">
-        Predict an Iris flower species using four measurements.
-        Explore the dataset and compare your input with the original samples.
+    <div class="subtitle">
+    Enter four flower measurements and compare predictions from three
+    classification algorithms.
     </div>
     """,
     unsafe_allow_html=True,
@@ -303,247 +138,213 @@ st.markdown(
 
 
 # --------------------------------------------------
-# Sidebar: input measurements
+# Input controls
 # --------------------------------------------------
-st.sidebar.markdown("## Flower Measurements")
-st.sidebar.caption("Adjust the four measurements below.")
+st.sidebar.header("Flower Measurements")
+st.sidebar.caption(
+    "The input ranges are based on the minimum and maximum values "
+    "in the Iris dataset."
+)
 
-input_values = {}
+measurement_ranges = {
+    "Sepal Length": (4.3, 7.9),
+    "Sepal Width": (2.0, 4.4),
+    "Petal Length": (1.0, 6.9),
+    "Petal Width": (0.1, 2.5),
+}
 
-for feature in FEATURES:
-    minimum = float(df[feature].min())
-    maximum = float(df[feature].max())
-
-    # Add a small margin so the slider is not restricted to the dataset range.
-    margin = max((maximum - minimum) * 0.05, 0.1)
-    slider_min = max(0.0, minimum - margin)
-    slider_max = maximum + margin
-
-    default_value = float(df[feature].median())
-
-    input_values[feature] = st.sidebar.slider(
-        FEATURE_LABELS[feature],
-        min_value=float(slider_min),
-        max_value=float(slider_max),
-        value=float(default_value),
-        step=0.1,
+st.sidebar.markdown("**Input ranges**")
+for feature, (minimum, maximum) in measurement_ranges.items():
+    st.sidebar.write(
+        f"{feature}: {minimum}–{maximum} cm"
     )
 
-predict_button = st.sidebar.button(
-    "Predict Species",
-    type="primary",
+st.sidebar.divider()
+
+sepal_length = st.sidebar.slider(
+    "Sepal Length (cm)",
+    min_value=4.3,
+    max_value=7.9,
+    value=5.8,
+    step=0.1,
+)
+
+sepal_width = st.sidebar.slider(
+    "Sepal Width (cm)",
+    min_value=2.0,
+    max_value=4.4,
+    value=3.0,
+    step=0.1,
+)
+
+petal_length = st.sidebar.slider(
+    "Petal Length (cm)",
+    min_value=1.0,
+    max_value=6.9,
+    value=4.0,
+    step=0.1,
+)
+
+petal_width = st.sidebar.slider(
+    "Petal Width (cm)",
+    min_value=0.1,
+    max_value=2.5,
+    value=1.2,
+    step=0.1,
+)
+
+input_data = pd.DataFrame(
+    [[sepal_length, sepal_width, petal_length, petal_width]],
+    columns=X.columns,
 )
 
 
 # --------------------------------------------------
-# Prediction
+# Predict with all three algorithms
 # --------------------------------------------------
-input_df = pd.DataFrame([input_values], columns=FEATURES)
+st.subheader("Prediction Comparison")
 
-prediction = model.predict(input_df)[0]
-probabilities = model.predict_proba(input_df)[0]
+results = []
 
-predicted_index = species_list.index(prediction)
-predicted_label = species_display_names[prediction]
-confidence = float(probabilities[predicted_index]) * 100
+for model_name, model in models.items():
+    predicted_class = int(model.predict(input_data)[0])
+    probabilities = model.predict_proba(input_data)[0]
+    confidence = float(probabilities[predicted_class]) * 100
 
+    results.append(
+        {
+            "Algorithm": model_name,
+            "Predicted Species": species_names[predicted_class].title(),
+            "Confidence": confidence,
+            "Test Accuracy": test_accuracies[model_name] * 100,
+        }
+    )
 
-# --------------------------------------------------
-# Prediction summary
-# --------------------------------------------------
-st.markdown(
-    '<div class="section-label">Prediction Result</div>',
-    unsafe_allow_html=True,
+results_df = pd.DataFrame(results)
+
+# Display results in a table
+display_results = results_df.copy()
+display_results["Confidence"] = display_results["Confidence"].map(
+    lambda value: f"{value:.1f}%"
+)
+display_results["Test Accuracy"] = display_results["Test Accuracy"].map(
+    lambda value: f"{value:.1f}%"
 )
 
-st.markdown(
-    '<div class="section-title">Predicted flower species</div>',
-    unsafe_allow_html=True,
+st.dataframe(
+    display_results,
+    hide_index=True,
+    use_container_width=True,
 )
 
-st.markdown(
-    '<div class="section-description">'
-    'The model uses a Random Forest classifier trained on the loaded Iris dataset.'
-    '</div>',
-    unsafe_allow_html=True,
-)
+# Highlight each model's prediction
+metric_columns = st.columns(3)
 
-metric_col1, metric_col2, metric_col3 = st.columns(3)
-
-with metric_col1:
-    st.metric("Predicted Species", predicted_label)
-
-with metric_col2:
-    st.metric("Model Confidence", f"{confidence:.1f}%")
-
-with metric_col3:
-    st.metric("Dataset Samples", f"{len(df):,}")
-
-
-# --------------------------------------------------
-# Input summary
-# --------------------------------------------------
-st.markdown("### Your Measurements")
-
-measurement_columns = st.columns(4)
-
-for column, feature in zip(measurement_columns, FEATURES):
+for column, result in zip(metric_columns, results):
     with column:
         st.metric(
-            FEATURE_LABELS[feature],
-            f"{input_values[feature]:.1f}",
+            label=result["Algorithm"],
+            value=result["Predicted Species"],
+            delta=f"Confidence: {result['Confidence']:.1f}%",
         )
 
 
 # --------------------------------------------------
-# Probability chart
+# Graphs: length on X-axis, width on Y-axis
 # --------------------------------------------------
-st.markdown("---")
-
-st.markdown(
-    '<div class="section-label">Model Analysis</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="section-title">Prediction probabilities</div>',
-    unsafe_allow_html=True,
-)
-
-probability_data = pd.DataFrame(
-    {
-        "Species": [
-            species_display_names[species]
-            for species in model.classes_
-        ],
-        "Probability": probabilities * 100,
-    }
-).sort_values("Probability", ascending=False)
-
-st.bar_chart(
-    probability_data.set_index("Species"),
-    y="Probability",
-    color="#818cf8",
-)
-
+st.divider()
+st.subheader("Measurement Maps")
 st.caption(
-    "Probabilities show how strongly the model associates the measurements "
-    "with each species. They are not a guarantee of the actual species."
+    "The colored dots show the Iris dataset. "
+    "The red star shows your entered measurements."
 )
 
-
-# --------------------------------------------------
-# English-only graph
-# --------------------------------------------------
-st.markdown("---")
-
-st.markdown(
-    '<div class="section-label">Data Visualization</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="section-title">Petal measurement map</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="section-description">'
-    'Compare your flower with the original dataset. '
-    'The red star marks your selected measurements.'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-# Use an English font and English-only text in the graph.
+# English labels and font are used inside the charts.
 plt.rcParams["font.family"] = "DejaVu Sans"
 plt.rcParams["axes.unicode_minus"] = False
 
-fig, ax = plt.subplots(figsize=(10, 6))
+fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 fig.patch.set_facecolor("#111827")
-ax.set_facecolor("#111827")
+
+chart_settings = [
+    {
+        "ax": axes[0],
+        "x_column": "Petal Length",
+        "y_column": "Petal Width",
+        "x_value": petal_length,
+        "y_value": petal_width,
+        "title": "Petal Length vs. Petal Width",
+    },
+    {
+        "ax": axes[1],
+        "x_column": "Sepal Length",
+        "y_column": "Sepal Width",
+        "x_value": sepal_length,
+        "y_value": sepal_width,
+        "title": "Sepal Length vs. Sepal Width",
+    },
+]
 
 colors = ["#818cf8", "#34d399", "#fbbf24"]
 
-for index, species in enumerate(species_list):
-    species_data = df[df[TARGET] == species]
+for settings in chart_settings:
+    ax = settings["ax"]
+    ax.set_facecolor("#111827")
 
-    # Use the English display name instead of the original CSV label.
-    english_label = species_display_names[species]
+    for class_index, species_name in enumerate(chart_species_names):
+        class_data = X[y == class_index]
+
+        ax.scatter(
+            class_data[settings["x_column"]],
+            class_data[settings["y_column"]],
+            label=species_name,
+            color=colors[class_index],
+            s=55,
+            alpha=0.8,
+            edgecolors="none",
+        )
 
     ax.scatter(
-        species_data["PetalLengthCm"],
-        species_data["PetalWidthCm"],
-        label=english_label,
-        color=colors[index % len(colors)],
-        s=65,
-        alpha=0.8,
-        edgecolors="none",
+        settings["x_value"],
+        settings["y_value"],
+        marker="*",
+        s=380,
+        color="#f87171",
+        edgecolors="white",
+        linewidths=1.2,
+        label="Your Input",
+        zorder=10,
     )
 
-ax.scatter(
-    input_values["PetalLengthCm"],
-    input_values["PetalWidthCm"],
-    marker="*",
-    s=450,
-    color="#f87171",
-    edgecolors="white",
-    linewidths=1.5,
-    label="Your Input",
-    zorder=10,
-)
+    ax.set_title(
+        settings["title"],
+        color="#f9fafb",
+        fontsize=12,
+        fontweight="bold",
+    )
+    ax.set_xlabel(
+        f"{settings['x_column']} (cm)",
+        color="#e5e7eb",
+    )
+    ax.set_ylabel(
+        f"{settings['y_column']} (cm)",
+        color="#e5e7eb",
+    )
 
-ax.annotate(
-    (
-        "Your Input\n"
-        f"({input_values['PetalLengthCm']:.2f}, "
-        f"{input_values['PetalWidthCm']:.2f})"
-    ),
-    (
-        input_values["PetalLengthCm"],
-        input_values["PetalWidthCm"],
-    ),
-    xytext=(12, 12),
-    textcoords="offset points",
-    color="white",
-    fontsize=10,
-    fontweight="bold",
-)
+    ax.tick_params(colors="#d1d5db")
+    ax.grid(color="#374151", alpha=0.4, linestyle="--")
 
-ax.set_xlabel(
-    "Petal Length (cm)",
-    color="#e5e7eb",
-    fontsize=11,
-)
+    for spine in ax.spines.values():
+        spine.set_color("#4b5563")
 
-ax.set_ylabel(
-    "Petal Width (cm)",
-    color="#e5e7eb",
-    fontsize=11,
-)
+    legend = ax.legend(
+        facecolor="#1f2937",
+        edgecolor="#374151",
+        labelcolor="white",
+    )
 
-ax.set_title(
-    "Iris Petal Distribution",
-    color="#f9fafb",
-    fontsize=15,
-    fontweight="bold",
-    pad=15,
-)
-
-ax.tick_params(colors="#d1d5db")
-ax.grid(color="#374151", alpha=0.45, linestyle="--")
-
-for spine in ax.spines.values():
-    spine.set_color("#4b5563")
-
-legend = ax.legend(
-    facecolor="#1f2937",
-    edgecolor="#374151",
-    labelcolor="white",
-)
-
-for text in legend.get_texts():
-    text.set_fontsize(10)
+    for text in legend.get_texts():
+        text.set_fontsize(9)
 
 fig.tight_layout()
 st.pyplot(fig, use_container_width=True)
@@ -551,45 +352,65 @@ plt.close(fig)
 
 
 # --------------------------------------------------
-# Feature importance
+# Algorithm explanations
 # --------------------------------------------------
-st.markdown("---")
+st.divider()
+st.subheader("How the Algorithms Work")
 
-st.markdown(
-    '<div class="section-title">Feature importance</div>',
-    unsafe_allow_html=True,
-)
+with st.expander("1. Random Forest"):
+    st.write(
+        """
+        Random Forest creates many decision trees using different samples
+        and feature combinations from the training data.
 
-st.markdown(
-    '<div class="section-description">'
-    'This chart shows how much each measurement contributed to the trained model.'
-    '</div>',
-    unsafe_allow_html=True,
-)
+        Each tree predicts a species. The model combines the trees' votes
+        and chooses the species with the most votes.
 
-importance_data = pd.DataFrame(
-    {
-        "Feature": [FEATURE_LABELS[feature] for feature in FEATURES],
-        "Importance": model.feature_importances_,
-    }
-).sort_values("Importance", ascending=False)
+        **Strength:** Often performs well on varied data and can model
+        complex relationships.
+        """
+    )
 
-st.bar_chart(
-    importance_data.set_index("Feature"),
-    y="Importance",
-    color="#34d399",
-)
+with st.expander("2. Support Vector Machine (SVM)"):
+    st.write(
+        """
+        SVM searches for a boundary that separates the species while
+        keeping the margin between classes as wide as possible.
+
+        This app uses an RBF kernel, which can create curved boundaries
+        when the classes cannot be separated well by a straight line.
+
+        **Strength:** Effective for datasets with clear class boundaries.
+        """
+    )
+
+with st.expander("3. K-Nearest Neighbors (KNN)"):
+    st.write(
+        """
+        KNN finds the five training flowers closest to the input flower
+        and predicts the species that appears most often among those
+        neighbors.
+
+        The measurements are standardized first so that features with
+        larger numerical values do not dominate the distance calculation.
+
+        **Strength:** Simple to understand and bases predictions on
+        nearby examples.
+        """
+    )
 
 
 # --------------------------------------------------
-# Dataset preview
+# Dataset information
 # --------------------------------------------------
-with st.expander("View dataset preview"):
-    st.caption(f"Loaded file: {dataset_filename}")
-    st.dataframe(df.head(20), use_container_width=True)
+with st.expander("About the dataset"):
+    st.write(
+        """
+        The Iris dataset contains 150 flower samples from three species:
+        Setosa, Versicolor, and Virginica. Each sample has four measurements:
+        sepal length, sepal width, petal length, and petal width.
 
-    st.caption("Dataset summary")
-    st.dataframe(
-        df[FEATURES].describe().round(2),
-        use_container_width=True,
+        The displayed input ranges are the minimum and maximum values
+        found in this dataset.
+        """
     )
