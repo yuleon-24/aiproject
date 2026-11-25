@@ -1,210 +1,123 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import accuracy_score
 
 
 # --------------------------------------------------
-# 페이지 설정
+# 1. 페이지 설정 및 글자 색상
 # --------------------------------------------------
+
 st.set_page_config(
-    page_title="펭귄 종 예측 AI",
+    page_title="펭귄 품종 예측",
     page_icon="🐧",
     layout="wide"
 )
 
+# 배경은 흰색, 글씨는 어두운 색으로 설정
+st.markdown("""
+<style>
+/* 전체 배경과 기본 글자 */
+.stApp {
+    background-color: #FFFFFF !important;
+    color: #1A1A1A !important;
+}
 
-# --------------------------------------------------
-# 전체 색상 테마
-# 어두운 배경 + 밝은 글씨로 대비 강화
-# --------------------------------------------------
-st.markdown(
-    """
-    <style>
-    /* 전체 앱 배경과 기본 글자색 */
-    .stApp {
-        background-color: #0b1120;
-        color: #f8fafc;
-    }
+/* 일반 글자 */
+.stApp p,
+.stApp label,
+.stApp span,
+.stApp li,
+.stApp h1,
+.stApp h2,
+.stApp h3,
+.stApp h4 {
+    color: #1A1A1A !important;
+}
 
-    html, body, [class*="css"] {
-        color: #f8fafc !important;
-    }
+/* 입력창 */
+.stApp input,
+.stApp textarea,
+.stApp [data-baseweb="select"] > div {
+    background-color: #FFFFFF !important;
+    color: #1A1A1A !important;
+}
 
-    /* 기본 글자 */
-    p, li, label, span, div {
-        color: #f1f5f9;
-    }
+/* 입력창 안의 글자 */
+.stApp input::placeholder {
+    color: #666666 !important;
+}
 
-    /* 제목 */
-    h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-    }
+/* 버튼 */
+.stApp button {
+    background-color: #145DA0 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #145DA0 !important;
+}
 
-    /* 주요 콘텐츠 영역 */
-    [data-testid="stAppViewBlockContainer"] {
-        background-color: #0b1120;
-    }
+/* 버튼 안의 글자 */
+.stApp button p,
+.stApp button span {
+    color: #FFFFFF !important;
+}
 
-    /* 사이드바 */
-    [data-testid="stSidebar"] {
-        background-color: #111827;
-    }
+/* 정보 상자 */
+.stAlert {
+    background-color: #F0F6FF !important;
+}
 
-    /* 카드 */
-    .info-card {
-        background-color: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 14px;
-        padding: 18px;
-        margin-bottom: 12px;
-    }
-
-    .info-card h3 {
-        color: #ffffff !important;
-        margin-top: 0;
-    }
-
-    .info-card p {
-        color: #e2e8f0 !important;
-    }
-
-    /* 입력창 */
-    input, textarea {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border: 1px solid #64748b !important;
-        border-radius: 8px !important;
-    }
-
-    /* 숫자 입력창 내부 글씨 */
-    [data-testid="stNumberInput"] input {
-        color: #ffffff !important;
-        background-color: #1e293b !important;
-    }
-
-    /* 선택창 */
-    [data-testid="stSelectbox"] div,
-    [data-testid="stMultiSelect"] div {
-        color: #f8fafc !important;
-    }
-
-    [data-testid="stSelectbox"] [role="combobox"],
-    [data-testid="stMultiSelect"] [role="combobox"] {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-    }
-
-    /* 드롭다운 메뉴 */
-    [role="listbox"],
-    [role="option"] {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-    }
-
-    /* 슬라이더 */
-    [data-testid="stSlider"] * {
-        color: #f8fafc !important;
-    }
-
-    /* 버튼 */
-    .stButton > button,
-    .stDownloadButton > button {
-        background-color: #2563eb !important;
-        color: #ffffff !important;
-        border: 1px solid #60a5fa !important;
-        border-radius: 10px !important;
-        font-weight: 700 !important;
-    }
-
-    .stButton > button:hover,
-    .stDownloadButton > button:hover {
-        background-color: #1d4ed8 !important;
-        color: #ffffff !important;
-        border-color: #93c5fd !important;
-    }
-
-    /* 탭 */
-    button[data-baseweb="tab"] {
-        color: #cbd5e1 !important;
-        background-color: #111827 !important;
-    }
-
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #ffffff !important;
-        background-color: #1d4ed8 !important;
-        border-bottom: 3px solid #93c5fd !important;
-    }
-
-    /* 표 */
-    [data-testid="stDataFrame"] {
-        background-color: #1e293b;
-    }
-
-    /* 안내 메시지 */
-    [data-testid="stAlert"] {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border: 1px solid #475569 !important;
-    }
-
-    /* 구분선 */
-    hr {
-        border-color: #334155 !important;
-    }
-
-    /* 펼침 영역 */
-    [data-testid="stExpander"] {
-        background-color: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 10px;
-    }
-
-    /* 메트릭 */
-    [data-testid="stMetric"] {
-        background-color: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 12px;
-        padding: 12px;
-    }
-
-    [data-testid="stMetricLabel"] {
-        color: #cbd5e1 !important;
-    }
-
-    [data-testid="stMetricValue"] {
-        color: #ffffff !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+/* 표 */
+[data-testid="stDataFrame"] {
+    background-color: #FFFFFF !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 # --------------------------------------------------
-# 데이터 불러오기
+# 2. 제목
 # --------------------------------------------------
+
+st.title("🐧 펭귄 품종 예측 프로그램")
+st.write("펭귄의 날개 길이, 몸무게, 부리 길이를 입력하면 품종을 예측합니다.")
+
+st.divider()
+
+
+# --------------------------------------------------
+# 3. 데이터 불러오기
+# --------------------------------------------------
+
 @st.cache_data
 def load_data():
-    df = pd.read_csv("penguins.csv")
+    data = pd.read_csv("penguins.csv")
 
-    # 컬럼명 앞뒤 공백 제거
-    df.columns = df.columns.str.strip()
+    # 예측에 필요한 열만 사용
+    data = data[
+        [
+            "species",
+            "flipper_length_mm",
+            "body_mass_g",
+            "bill_length_mm"
+        ]
+    ]
 
-    return df
+    # 비어 있는 데이터 제거
+    data = data.dropna()
+
+    return data
 
 
 try:
     df = load_data()
-except FileNotFoundError:
+
+except Exception:
     st.error(
         "penguins.csv 파일을 찾을 수 없습니다. "
         "app.py와 같은 폴더에 penguins.csv 파일을 넣어주세요."
@@ -213,45 +126,304 @@ except FileNotFoundError:
 
 
 # --------------------------------------------------
-# 사용할 컬럼 확인
+# 4. 학습 데이터 준비
 # --------------------------------------------------
-required_columns = [
-    "species",
-    "flipper_length_mm",
-    "body_mass_g",
-    "bill_length_mm"
+
+X = df[
+    [
+        "flipper_length_mm",
+        "body_mass_g",
+        "bill_length_mm"
+    ]
 ]
 
-missing_columns = [
-    col for col in required_columns if col not in df.columns
-]
+y = df["species"]
 
-if missing_columns:
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+
+# --------------------------------------------------
+# 5. 알고리즘 학습
+# --------------------------------------------------
+
+# 알고리즘 1: 랜덤 포레스트
+model_rf = RandomForestClassifier(
+    n_estimators=100,
+    random_state=42
+)
+
+model_rf.fit(X_train, y_train)
+
+
+# 알고리즘 2: K-최근접 이웃
+# KNN은 데이터의 거리로 품종을 예측하는 알고리즘입니다.
+model_knn = make_pipeline(
+    StandardScaler(),
+    KNeighborsClassifier(n_neighbors=5)
+)
+
+model_knn.fit(X_train, y_train)
+
+
+# 두 알고리즘의 정확도 계산
+rf_accuracy = accuracy_score(
+    y_test,
+    model_rf.predict(X_test)
+)
+
+knn_accuracy = accuracy_score(
+    y_test,
+    model_knn.predict(X_test)
+)
+
+
+# --------------------------------------------------
+# 6. 입력 범위 안내
+# --------------------------------------------------
+
+st.header("1. 펭귄 정보 입력")
+
+st.info(
+    "아래 입력 범위는 penguins.csv 데이터에 들어 있는 "
+    "최솟값과 최댓값을 기준으로 합니다."
+)
+
+col1, col2, col3 = st.columns(3)
+
+# 실제 데이터의 최솟값과 최댓값
+wing_min = int(df["flipper_length_mm"].min())
+wing_max = int(df["flipper_length_mm"].max())
+
+weight_min = int(df["body_mass_g"].min())
+weight_max = int(df["body_mass_g"].max())
+
+bill_min = float(df["bill_length_mm"].min())
+bill_max = float(df["bill_length_mm"].max())
+
+
+with col1:
+    st.write(f"날개 길이 범위: {wing_min}~{wing_max} mm")
+
+    wing_length = st.number_input(
+        "날개 길이 (mm)",
+        min_value=float(wing_min),
+        max_value=float(wing_max),
+        value=float(df["flipper_length_mm"].median()),
+        step=1.0
+    )
+
+
+with col2:
+    st.write(f"몸무게 범위: {weight_min}~{weight_max} g")
+
+    body_mass = st.number_input(
+        "몸무게 (g)",
+        min_value=float(weight_min),
+        max_value=float(weight_max),
+        value=float(df["body_mass_g"].median()),
+        step=50.0
+    )
+
+
+with col3:
+    st.write(f"부리 길이 범위: {bill_min:.1f}~{bill_max:.1f} mm")
+
+    bill_length = st.number_input(
+        "부리 길이 (mm)",
+        min_value=float(bill_min),
+        max_value=float(bill_max),
+        value=float(df["bill_length_mm"].median()),
+        step=0.1
+    )
+
+
+# 사용자가 입력한 값을 표로 만들기
+input_data = pd.DataFrame(
+    [[wing_length, body_mass, bill_length]],
+    columns=[
+        "flipper_length_mm",
+        "body_mass_g",
+        "bill_length_mm"
+    ]
+)
+
+
+# --------------------------------------------------
+# 7. 품종 예측
+# --------------------------------------------------
+
+st.header("2. 예측 결과")
+
+if st.button("펭귄 품종 예측하기", use_container_width=True):
+
+    # 랜덤 포레스트로 예측
+    prediction = model_rf.predict(input_data)[0]
+
+    # 품종 이름을 보기 좋게 표시
+    species_names = {
+        "Adelie": "아델리 펭귄",
+        "Chinstrap": "턱끈 펭귄",
+        "Gentoo": "젠투 펭귄"
+    }
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import accuracy_score
+
+
+# ==================================================
+# 1. 페이지 설정
+# ==================================================
+
+st.set_page_config(
+    page_title="펭귄 품종 예측",
+    page_icon="🐧",
+    layout="wide"
+)
+
+
+# ==================================================
+# 2. 화면 디자인
+# ==================================================
+
+st.markdown("""
+<style>
+/* 전체 배경과 기본 글자 */
+.stApp {
+    background-color: #FFFFFF !important;
+    color: #172B4D !important;
+}
+
+/* 제목과 일반 글자 */
+.stApp h1,
+.stApp h2,
+.stApp h3,
+.stApp h4,
+.stApp p,
+.stApp label,
+.stApp li,
+.stApp span {
+    color: #172B4D !important;
+}
+
+/* 입력창 */
+.stApp input,
+.stApp textarea {
+    background-color: #FFFFFF !important;
+    color: #172B4D !important;
+    border: 1px solid #A6B5C5 !important;
+}
+
+/* 선택 상자 */
+.stApp [data-baseweb="select"] > div {
+    background-color: #FFFFFF !important;
+    color: #172B4D !important;
+}
+
+/* 버튼 */
+.stApp button {
+    background-color: #145DA0 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #145DA0 !important;
+    border-radius: 8px !important;
+}
+
+/* 버튼 내부 글자 */
+.stApp button p,
+.stApp button span {
+    color: #FFFFFF !important;
+}
+
+/* 정보 상자 */
+.stAlert {
+    background-color: #EAF3FF !important;
+}
+
+/* 표 배경 */
+[data-testid="stDataFrame"] {
+    background-color: #FFFFFF !important;
+}
+
+/* 구분선 */
+hr {
+    border-color: #D6E0EA !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ==================================================
+# 3. 제목과 안내
+# ==================================================
+
+st.title("🐧 펭귄 품종 예측 프로그램")
+
+st.markdown("""
+날개 길이, 몸무게, 부리 길이를 입력하면 펭귄의 품종을 예측합니다.
+
+**사용 알고리즘:** 랜덤 포레스트와 K-최근접 이웃(KNN)
+""")
+
+st.divider()
+
+
+# ==================================================
+# 4. 데이터 불러오기
+# ==================================================
+
+@st.cache_data
+def load_data():
+    data = pd.read_csv("penguins.csv")
+
+    needed_columns = [
+        "species",
+        "flipper_length_mm",
+        "body_mass_g",
+        "bill_length_mm"
+    ]
+
+    data = data[needed_columns].dropna()
+
+    return data
+
+
+try:
+    df = load_data()
+
+except FileNotFoundError:
     st.error(
-        "CSV 파일에 필요한 컬럼이 없습니다: "
-        + ", ".join(missing_columns)
+        "penguins.csv 파일을 찾을 수 없습니다.\n\n"
+        "app.py와 penguins.csv가 같은 폴더에 있는지 확인해주세요."
     )
     st.stop()
 
+except Exception as error:
+    st.error(f"데이터를 불러오는 중 문제가 발생했습니다: {error}")
+    st.stop()
 
-# 부리 깊이(bill_depth_mm)는 사용하지 않음
+
+# ==================================================
+# 5. 학습 데이터 준비
+# ==================================================
+
 feature_columns = [
     "flipper_length_mm",
     "body_mass_g",
     "bill_length_mm"
 ]
 
-df = df[required_columns].copy()
-df = df.dropna(subset=required_columns)
-
-if df.empty:
-    st.error("분석할 수 있는 데이터가 없습니다.")
-    st.stop()
-
-
-# --------------------------------------------------
-# 모델 학습
-# --------------------------------------------------
 X = df[feature_columns]
 y = df["species"]
 
@@ -264,381 +436,441 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 
-@st.cache_resource
-def train_models(X_train, X_test, y_train, y_test):
-    # 랜덤 포레스트
-    rf_model = RandomForestClassifier(
-        n_estimators=200,
-        random_state=42,
-        class_weight="balanced"
-    )
-    rf_model.fit(X_train, y_train)
+# ==================================================
+# 6. 알고리즘 학습
+# ==================================================
 
-    # SVM
-    svm_model = Pipeline(
-        steps=[
-            ("scaler", StandardScaler()),
-            ("model", SVC(
-                kernel="rbf",
-                probability=True,
-                class_weight="balanced",
-                random_state=42
-            ))
-        ]
-    )
-    svm_model.fit(X_train, y_train)
+# 랜덤 포레스트
+model_rf = RandomForestClassifier(
+    n_estimators=150,
+    random_state=42
+)
 
-    rf_pred = rf_model.predict(X_test)
-    svm_pred = svm_model.predict(X_test)
-
-    rf_accuracy = accuracy_score(y_test, rf_pred)
-    svm_accuracy = accuracy_score(y_test, svm_pred)
-
-    return (
-        rf_model,
-        svm_model,
-        rf_accuracy,
-        svm_accuracy,
-        rf_pred,
-        svm_pred
-    )
+model_rf.fit(X_train, y_train)
 
 
-(
-    rf_model,
-    svm_model,
-    rf_accuracy,
-    svm_accuracy,
-    rf_pred,
-    svm_pred
-) = train_models(X_train, X_test, y_train, y_test)
+# K-최근접 이웃
+# KNN은 입력값과 가까운 데이터 5개의 품종을 참고합니다.
+model_knn = make_pipeline(
+    StandardScaler(),
+    KNeighborsClassifier(n_neighbors=5)
+)
+
+model_knn.fit(X_train, y_train)
 
 
-# --------------------------------------------------
-# 제목
-# --------------------------------------------------
-st.title("🐧 펭귄 종 예측 AI")
-st.markdown(
-    """
-    펭귄의 **날개 길이, 몸무게, 부리 길이**를 입력하면
-    AI가 펭귄의 종을 예측합니다.
-    """
+# 정확도 계산
+rf_accuracy = accuracy_score(
+    y_test,
+    model_rf.predict(X_test)
+)
+
+knn_accuracy = accuracy_score(
+    y_test,
+    model_knn.predict(X_test)
 )
 
 
-# --------------------------------------------------
-# 데이터 요약
-# --------------------------------------------------
-st.subheader("📊 데이터 미리보기")
+# ==================================================
+# 7. 입력 범위 계산
+# ==================================================
+
+wing_min = int(df["flipper_length_mm"].min())
+wing_max = int(df["flipper_length_mm"].max())
+
+weight_min = int(df["body_mass_g"].min())
+weight_max = int(df["body_mass_g"].max())
+
+bill_min = float(df["bill_length_mm"].min())
+bill_max = float(df["bill_length_mm"].max())
+
+
+# ==================================================
+# 8. 사용자 입력
+# ==================================================
+
+st.header("1. 펭귄 정보 입력")
+
+st.info(
+    "각 항목의 입력 범위는 데이터에 기록된 최솟값과 최댓값입니다."
+)
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("전체 데이터 수", f"{len(df):,}개")
+    st.markdown("**날개 길이**")
+    st.caption(f"입력 범위: {wing_min}~{wing_max} mm")
+
+    wing_length = st.number_input(
+        "날개 길이 (mm)",
+        min_value=float(wing_min),
+        max_value=float(wing_max),
+        value=float(df["flipper_length_mm"].median()),
+        step=1.0,
+        key="wing"
+    )
 
 with col2:
-    st.metric("펭귄 종 수", f"{df['species'].nunique()}종")
+    st.markdown("**몸무게**")
+    st.caption(f"입력 범위: {weight_min}~{weight_max} g")
+
+    body_mass = st.number_input(
+        "몸무게 (g)",
+        min_value=float(weight_min),
+        max_value=float(weight_max),
+        value=float(df["body_mass_g"].median()),
+        step=50.0,
+        key="weight"
+    )
 
 with col3:
-    st.metric("사용한 입력 변수", "3개")
+    st.markdown("**부리 길이**")
+    st.caption(f"입력 범위: {bill_min:.1f}~{bill_max:.1f} mm")
 
-with st.expander("데이터 일부 보기"):
-    st.dataframe(df.head(10), use_container_width=True)
-
-
-# --------------------------------------------------
-# 사용자 입력
-# --------------------------------------------------
-st.subheader("🔎 펭귄 정보 입력")
-
-st.markdown(
-    "아래 입력창에서 값을 선택하세요. 각 입력창의 최소·최대 범위는 "
-    "CSV 데이터에 들어 있는 실제 값의 범위를 기준으로 설정됩니다."
-)
-
-input_col1, input_col2, input_col3 = st.columns(3)
-
-flipper_min = int(df["flipper_length_mm"].min())
-flipper_max = int(df["flipper_length_mm"].max())
-flipper_default = int(df["flipper_length_mm"].median())
-
-mass_min = int(df["body_mass_g"].min())
-mass_max = int(df["body_mass_g"].max())
-mass_default = int(df["body_mass_g"].median())
-
-bill_min = float(df["bill_length_mm"].min())
-bill_max = float(df["bill_length_mm"].max())
-bill_default = float(df["bill_length_mm"].median())
-
-with input_col1:
-    flipper_length = st.slider(
-        "날개 길이 (mm)",
-        min_value=flipper_min,
-        max_value=flipper_max,
-        value=flipper_default
-    )
-
-with input_col2:
-    body_mass = st.slider(
-        "몸무게 (g)",
-        min_value=mass_min,
-        max_value=mass_max,
-        value=mass_default,
-        step=50
-    )
-
-with input_col3:
-    bill_length = st.slider(
+    bill_length = st.number_input(
         "부리 길이 (mm)",
         min_value=float(bill_min),
         max_value=float(bill_max),
-        value=float(bill_default),
-        step=0.1
+        value=float(df["bill_length_mm"].median()),
+        step=0.1,
+        key="bill"
     )
 
 
-# --------------------------------------------------
-# 예측 모델 선택
-# --------------------------------------------------
-model_choice = st.selectbox(
-    "사용할 예측 알고리즘 선택",
-    ["랜덤 포레스트", "서포트 벡터 머신(SVM)"]
+input_data = pd.DataFrame(
+    [[wing_length, body_mass, bill_length]],
+    columns=feature_columns
 )
 
-if model_choice == "랜덤 포레스트":
-    selected_model = rf_model
-else:
-    selected_model = svm_model
 
+# ==================================================
+# 9. 품종 예측
+# ==================================================
 
-# --------------------------------------------------
-# 예측 실행
-# --------------------------------------------------
-if st.button("🔮 펭귄 종 예측하기", use_container_width=True):
-    user_input = pd.DataFrame(
-        [[flipper_length, body_mass, bill_length]],
-        columns=feature_columns
+st.header("2. 예측 결과")
+
+if st.button("품종 예측하기", type="primary", use_container_width=True):
+
+    prediction = model_rf.predict(input_data)[0]
+
+    species_names = {
+        "Adelie": "아델리 펭귄",
+        "Chinstrap": "턱끈 펭귄",
+        "Gentoo": "젠투 펭귄"
+    }
+
+    st.success(
+        f"예측 결과: {species_names.get(prediction, prediction)}"
     )
 
-    prediction = selected_model.predict(user_input)[0]
-    probabilities = selected_model.predict_proba(user_input)[0]
+    st.caption(
+        "예측 결과는 입력한 값과 학습 데이터에 따라 달라질 수 있습니다."
+    )
 
-    classes = selected_model.classes_
-    probability_df = pd.DataFrame({
-        "펭귄 종": classes,
-        "예측 확률": probabilities
-    }).sort_values("예측 확률", ascending=False)
+    st.write("입력한 정보")
 
-    st.session_state["prediction"] = prediction
-    st.session_state["probability_df"] = probability_df
-    st.session_state["user_input"] = user_input
-    st.session_state["model_choice"] = model_choice
+    result_table = pd.DataFrame({
+        "항목": ["날개 길이", "몸무게", "부리 길이"],
+        "입력값": [
+            f"{wing_length:.1f} mm",
+            f"{body_mass:.0f} g",
+            f"{bill_length:.1f} mm"
+        ]
+    })
 
-
-# --------------------------------------------------
-# 예측 결과
-# --------------------------------------------------
-if "prediction" in st.session_state:
-    st.subheader("🎯 예측 결과")
-
-    result_col1, result_col2 = st.columns([1, 2])
-
-    with result_col1:
-        st.markdown(
-            f"""
-            <div class="info-card">
-                <h3>AI가 예측한 종</h3>
-                <h2 style="color:#93c5fd !important;">
-                    {st.session_state["prediction"]}
-                </h2>
-                <p>사용 알고리즘: {st.session_state["model_choice"]}</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    with result_col2:
-        st.markdown("**종별 예측 확률**")
-        probability_df = st.session_state["probability_df"]
-
-        fig_prob = px.bar(
-            probability_df,
-            x="펭귄 종",
-            y="예측 확률",
-            color="펭귄 종",
-            text=probability_df["예측 확률"].map(
-                lambda x: f"{x:.1%}"
-            )
-        )
-
-        fig_prob.update_layout(
-            paper_bgcolor="#1e293b",
-            plot_bgcolor="#1e293b",
-            font=dict(color="#f8fafc"),
-            yaxis=dict(
-                tickformat=".0%",
-                gridcolor="#475569"
-            ),
-            xaxis=dict(gridcolor="#475569"),
-            showlegend=False
-        )
-
-        st.plotly_chart(fig_prob, use_container_width=True)
+    st.dataframe(
+        result_table,
+        use_container_width=True,
+        hide_index=True
+    )
 
 
-# --------------------------------------------------
-# 산점도: 날개 길이와 부리 길이
-# --------------------------------------------------
-st.subheader("📍 펭귄 데이터 산점도")
-st.markdown(
-    "가로축은 **날개 길이**, 세로축은 **부리 길이**입니다. "
-    "예측을 실행하면 입력한 펭귄이 별표로 표시됩니다."
+# ==================================================
+# 10. 알고리즘 정확도 비교
+# ==================================================
+
+st.header("3. 알고리즘 정확도 비교")
+
+st.write(
+    "같은 테스트 데이터에 두 알고리즘을 적용해 정확도를 비교합니다."
 )
 
-fig_scatter = px.scatter(
-    df,
-    x="flipper_length_mm",
-    y="bill_length_mm",
-    color="species",
-    hover_data=["body_mass_g"],
-    labels={
-        "flipper_length_mm": "날개 길이 (mm)",
-        "bill_length_mm": "부리 길이 (mm)",
-        "species": "펭귄 종",
-        "body_mass_g": "몸무게 (g)"
-    },
-    color_discrete_sequence=[
-        "#38bdf8",
-        "#fbbf24",
-        "#f472b6"
+accuracy_table = pd.DataFrame({
+    "알고리즘": ["랜덤 포레스트", "K-최근접 이웃"],
+    "정확도 (%)": [
+        rf_accuracy * 100,
+        knn_accuracy * 100
     ]
-)
-
-if "user_input" in st.session_state:
-    user_point = st.session_state["user_input"]
-
-    fig_scatter.add_trace(
-        go.Scatter(
-            x=user_point["flipper_length_mm"],
-            y=user_point["bill_length_mm"],
-            mode="markers",
-            name="내가 입력한 펭귄",
-            marker=dict(
-                symbol="star",
-                size=20,
-                color="#ffffff",
-                line=dict(color="#ef4444", width=3)
-            )
-        )
-    )
-
-fig_scatter.update_layout(
-    paper_bgcolor="#0b1120",
-    plot_bgcolor="#1e293b",
-    font=dict(color="#f8fafc"),
-    xaxis=dict(
-        title="날개 길이 (mm)",
-        gridcolor="#475569",
-        zerolinecolor="#64748b"
-    ),
-    yaxis=dict(
-        title="부리 길이 (mm)",
-        gridcolor="#475569",
-        zerolinecolor="#64748b"
-    ),
-    legend=dict(
-        bgcolor="#1e293b",
-        font=dict(color="#f8fafc")
-    )
-)
-
-st.plotly_chart(fig_scatter, use_container_width=True)
-
-
-# --------------------------------------------------
-# 알고리즘 비교
-# --------------------------------------------------
-st.subheader("⚖️ 두 알고리즘 성능 비교")
-
-compare_col1, compare_col2 = st.columns(2)
-
-with compare_col1:
-    st.metric("랜덤 포레스트 정확도", f"{rf_accuracy:.1%}")
-
-with compare_col2:
-    st.metric("SVM 정확도", f"{svm_accuracy:.1%}")
-
-comparison_df = pd.DataFrame({
-    "알고리즘": ["랜덤 포레스트", "SVM"],
-    "정확도": [rf_accuracy, svm_accuracy]
 })
 
-fig_compare = px.bar(
-    comparison_df,
+st.bar_chart(
+    accuracy_table,
     x="알고리즘",
-    y="정확도",
-    text=comparison_df["정확도"].map(lambda x: f"{x:.1%}"),
-    color="알고리즘",
-    color_discrete_sequence=["#38bdf8", "#fbbf24"]
+    y="정확도 (%)"
 )
 
-fig_compare.update_layout(
-    paper_bgcolor="#0b1120",
-    plot_bgcolor="#1e293b",
-    font=dict(color="#f8fafc"),
-    yaxis=dict(
-        range=[0, 1],
-        tickformat=".0%",
-        gridcolor="#475569"
-    ),
-    xaxis=dict(gridcolor="#475569"),
-    showlegend=False
-)
+accuracy_col1, accuracy_col2 = st.columns(2)
 
-st.plotly_chart(fig_compare, use_container_width=True)
-
-
-# --------------------------------------------------
-# 알고리즘 설명
-# --------------------------------------------------
-st.subheader("🧠 사용한 알고리즘 설명")
-
-tab1, tab2 = st.tabs(["랜덤 포레스트", "서포트 벡터 머신(SVM)"])
-
-with tab1:
-    st.markdown(
-        """
-        **랜덤 포레스트(Random Forest)**
-
-        여러 개의 결정 트리를 만들고, 각 트리의 예측 결과를 모아
-        최종 종을 결정하는 알고리즘입니다.
-
-        - 여러 트리의 결과를 종합해 예측합니다.
-        - 변수 사이의 복잡한 관계를 학습할 수 있습니다.
-        - 이번 프로젝트에서는 펭귄의 세 가지 측정값을 이용해 종을 분류합니다.
-        """
+with accuracy_col1:
+    st.metric(
+        "랜덤 포레스트",
+        f"{rf_accuracy * 100:.1f}%"
     )
 
-with tab2:
-    st.markdown(
-        """
-        **서포트 벡터 머신(Support Vector Machine, SVM)**
-
-        데이터를 서로 구분할 수 있는 경계선을 찾고,
-        그 경계를 바탕으로 새로운 데이터의 종을 예측하는 알고리즘입니다.
-
-        - 데이터 사이의 구분 경계를 찾습니다.
-        - 변수의 크기 차이가 결과에 영향을 줄 수 있어 표준화를 함께 사용합니다.
-        - 이번 프로젝트에서는 날개 길이, 몸무게, 부리 길이를 이용해 종을 분류합니다.
-        """
+with accuracy_col2:
+    st.metric(
+        "K-최근접 이웃",
+        f"{knn_accuracy * 100:.1f}%"
     )
 
 
-# --------------------------------------------------
-# 마무리 안내
-# --------------------------------------------------
-st.markdown("---")
-st.caption(
-    "※ 예측 결과는 학습 데이터와 알고리즘에 따른 추정값이며, "
-    "실제 펭귄의 종을 확정하는 용도로 사용하지 않습니다."
+# ==================================================
+# 11. 알고리즘 설명
+# ==================================================
+
+st.header("4. 알고리즘 알아보기")
+
+with st.expander("랜덤 포레스트란?"):
+    st.write("""
+    여러 개의 의사결정나무를 만들고, 각 나무의 예측을 모아
+    최종 품종을 결정하는 알고리즘입니다.
+
+    여러 나무의 의견을 종합하기 때문에 하나의 나무만 사용하는 것보다
+    안정적인 예측을 할 수 있습니다.
+    """)
+
+with st.expander("K-최근접 이웃(KNN)이란?"):
+    st.write("""
+    입력한 펭귄과 특징이 비슷한 펭귄 5마리를 찾고,
+    그중 가장 많이 나타난 품종을 예측하는 알고리즘입니다.
+
+    비슷한 특징을 가진 데이터는 같은 품종일 가능성이 높다는
+    원리를 사용합니다.
+    """)
+
+
+# ==================================================
+# 12. 산점도 그래프
+# ==================================================
+
+st.header("5. 펭귄 데이터 그래프")
+
+st.write(
+    "가로축은 날개 길이, 세로축은 부리 길이입니다. "
+    "빨간 별표는 입력한 펭귄의 위치입니다."
 )
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+# 품종별 데이터 표시
+for species in df["species"].unique():
+
+    species_data = df[df["species"] == species]
+
+    ax.scatter(
+        species_data["flipper_length_mm"],
+        species_data["bill_length_mm"],
+        label=species,
+        s=55,
+        alpha=0.75
+    )
+
+
+# 입력한 펭귄 표시
+ax.scatter(
+    wing_length,
+    bill_length,
+    color="#E53935",
+    marker="*",
+    s=350,
+    edgecolors="black",
+    linewidths=1.2,
+    label="입력한 펭귄",
+    zorder=5
+)
+
+
+# 그래프 글자와 배경
+ax.set_title(
+    "Penguin Species",
+    fontsize=16,
+    color="#172B4D"
+)
+
+ax.set_xlabel(
+    "Flipper Length (mm)",
+    fontsize=12,
+    color="#172B4D"
+)
+
+ax.set_ylabel(
+    "Bill Length (mm)",
+    fontsize=12,
+    color="#172B4D"
+)
+
+ax.tick_params(axis="both", colors="#172B4D")
+
+ax.set_facecolor("#FFFFFF")
+fig.patch.set_facecolor("#FFFFFF")
+
+ax.grid(True, alpha=0.25)
+ax.legend()
+
+st.pyplot(fig)
+
+
+# ==================================================
+# 13. 데이터 확인
+# ==================================================
+
+with st.expander("사용한 데이터 확인하기"):
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+st.caption("데이터 출처: penguins.csv")
+    st.success(
+        f"예측된 품종: {species_names.get(prediction, prediction)}"
+    )
+
+    st.write("예측에 사용한 정보")
+
+    st.dataframe(
+        input_data.rename(
+            columns={
+                "flipper_length_mm": "날개 길이 (mm)",
+                "body_mass_g": "몸무게 (g)",
+                "bill_length_mm": "부리 길이 (mm)"
+            }
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# --------------------------------------------------
+# 8. 알고리즘 정확도 비교
+# --------------------------------------------------
+
+st.header("3. 알고리즘 정확도 비교")
+
+accuracy_data = pd.DataFrame({
+    "알고리즘": ["랜덤 포레스트", "K-최근접 이웃"],
+    "정확도 (%)": [rf_accuracy * 100, knn_accuracy * 100]
+})
+
+st.bar_chart(
+    accuracy_data.set_index("알고리즘"),
+    y="정확도 (%)"
+)
+
+st.write(
+    f"랜덤 포레스트 정확도: **{rf_accuracy * 100:.2f}%**"
+)
+
+st.write(
+    f"K-최근접 이웃 정확도: **{knn_accuracy * 100:.2f}%**"
+)
+
+
+# --------------------------------------------------
+# 9. 알고리즘 설명
+# --------------------------------------------------
+
+st.header("4. 알고리즘 설명")
+
+with st.expander("랜덤 포레스트란?"):
+    st.write(
+        "여러 개의 의사결정나무를 만들고, "
+        "각 나무의 예측 결과를 모아 최종 품종을 결정하는 알고리즘입니다. "
+        "여러 나무의 의견을 종합하기 때문에 하나의 나무보다 "
+        "안정적인 예측을 할 수 있습니다."
+    )
+
+with st.expander("K-최근접 이웃(KNN)이란?"):
+    st.write(
+        "입력한 펭귄과 특징이 비슷한 펭귄 5마리를 찾고, "
+        "그중 가장 많이 나타난 품종을 예측하는 알고리즘입니다. "
+        "비슷한 데이터끼리는 같은 품종일 가능성이 높다는 원리를 사용합니다."
+    )
+
+
+# --------------------------------------------------
+# 10. 산점도 그래프
+# --------------------------------------------------
+
+st.header("5. 날개 길이와 부리 길이 그래프")
+
+st.write(
+    "가로축은 날개 길이, 세로축은 부리 길이입니다. "
+    "빨간 별표는 입력한 펭귄의 위치입니다."
+)
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+# 품종별 데이터 표시
+for species in df["species"].unique():
+
+    species_data = df[df["species"] == species]
+
+    ax.scatter(
+        species_data["flipper_length_mm"],
+        species_data["bill_length_mm"],
+        label=species,
+        s=45,
+        alpha=0.75
+    )
+
+
+# 사용자가 입력한 값 표시
+ax.scatter(
+    wing_length,
+    bill_length,
+    color="red",
+    marker="*",
+    s=350,
+    edgecolors="black",
+    linewidths=1.2,
+    label="입력한 펭귄"
+)
+
+
+# 그래프 제목과 축
+ax.set_title(
+    "Penguin Species",
+    fontsize=16,
+    color="#1A1A1A"
+)
+
+ax.set_xlabel(
+    "Flipper Length (mm)",
+    fontsize=12,
+    color="#1A1A1A"
+)
+
+ax.set_ylabel(
+    "Bill Length (mm)",
+    fontsize=12,
+    color="#1A1A1A"
+)
+
+# 글자와 배경색을 명확하게 설정
+ax.tick_params(axis="both", colors="#1A1A1A")
+ax.set_facecolor("#FFFFFF")
+fig.patch.set_facecolor("#FFFFFF")
+
+ax.grid(True, alpha=0.25)
+ax.legend()
+
+st.pyplot(fig)
+
+
+# --------------------------------------------------
+# 11. 데이터 미리보기
+# --------------------------------------------------
+
+with st.expander("사용한 데이터 확인하기"):
+    st.dataframe(df, use_container_width=True)
