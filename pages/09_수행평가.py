@@ -15,6 +15,7 @@ from sklearn.metrics import (
     classification_report
 )
 
+
 # ==================================================
 # 1. 페이지 설정 및 디자인
 # ==================================================
@@ -26,92 +27,176 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# 전체 화면을 밝은 배경과 어두운 글씨로 설정
 st.markdown("""
 <style>
-    .stApp {
-        background: linear-gradient(
-            180deg,
-            #f4f8fc 0%,
-            #ffffff 45%,
-            #f0f7ff 100%
-        );
-    }
 
-    .block-container {
-        max-width: 1250px;
-        padding-top: 2rem;
-        padding-bottom: 4rem;
-    }
+/* 전체 배경 */
+.stApp {
+    background-color: #f5f8fc;
+    color: #172b4d;
+}
 
-    .hero {
-        padding: 30px;
-        border-radius: 24px;
-        background: linear-gradient(
-            120deg,
-            #102a43 0%,
-            #245b83 60%,
-            #3c83a5 100%
-        );
-        color: white;
-        margin-bottom: 24px;
-        box-shadow: 0 10px 30px rgba(16,42,67,0.15);
-    }
+/* 본문 너비 */
+.block-container {
+    max-width: 1250px;
+    padding-top: 2rem;
+    padding-bottom: 4rem;
+}
 
-    .hero h1 {
-        color: white;
-        font-size: 2.5rem;
-        margin-bottom: 8px;
-    }
+/* 기본 글씨 색상 */
+html, body, [class*="css"] {
+    color: #172b4d;
+}
 
-    .hero p {
-        color: #dceaf5;
-        font-size: 1.05rem;
-    }
+/* 제목 */
+h1, h2, h3, h4, h5, h6 {
+    color: #102a43 !important;
+}
 
-    .metric-card {
-        background: white;
-        border: 1px solid #e5edf5;
-        border-radius: 16px;
-        padding: 18px;
-        box-shadow: 0 4px 14px rgba(16,42,67,0.05);
-    }
+/* 일반 글씨 */
+p, li, label, span {
+    color: #243b53;
+}
 
-    .metric-label {
-        color: #64748b;
-        font-size: 0.9rem;
-    }
+/* 사이드바 */
+section[data-testid="stSidebar"] {
+    background-color: #eaf1f8;
+}
 
-    .metric-value {
-        color: #102a43;
-        font-size: 1.7rem;
-        font-weight: 700;
-        margin-top: 6px;
-    }
+section[data-testid="stSidebar"] * {
+    color: #172b4d;
+}
 
-    .section-title {
-        color: #102a43;
-        font-size: 1.45rem;
-        font-weight: 700;
-        margin-top: 20px;
-        margin-bottom: 12px;
-    }
+/* 상단 소개 영역 */
+.hero {
+    padding: 32px;
+    border-radius: 22px;
+    background: linear-gradient(
+        120deg,
+        #dceaf7 0%,
+        #eaf3fb 55%,
+        #f4f8fc 100%
+    );
+    border: 1px solid #c8d9e9;
+    margin-bottom: 28px;
+    box-shadow: 0 8px 24px rgba(16, 42, 67, 0.08);
+}
 
-    div[data-testid="stMetric"] {
-        background: white;
-        border: 1px solid #e5edf5;
-        border-radius: 14px;
-        padding: 16px;
-    }
+.hero h1 {
+    color: #102a43 !important;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
 
-    div[data-testid="stSidebar"] {
-        background-color: #edf4fa;
-    }
+.hero p {
+    color: #486581 !important;
+    font-size: 1.05rem;
+}
 
-    .stButton > button {
-        border-radius: 12px;
-        font-weight: 700;
-        min-height: 3rem;
-    }
+/* 섹션 제목 */
+.section-title {
+    color: #102a43;
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-top: 28px;
+    margin-bottom: 16px;
+}
+
+/* 카드 */
+div[data-testid="stMetric"] {
+    background-color: #ffffff;
+    border: 1px solid #d9e2ec;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 3px 12px rgba(16, 42, 67, 0.04);
+}
+
+div[data-testid="stMetric"] label {
+    color: #486581 !important;
+}
+
+div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+    color: #102a43 !important;
+}
+
+/* 입력 영역 */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #ffffff;
+    border-color: #d9e2ec;
+    border-radius: 16px;
+}
+
+/* 입력 상자 */
+input, textarea {
+    color: #102a43 !important;
+    background-color: #ffffff !important;
+}
+
+/* 선택 메뉴 */
+div[data-baseweb="select"] * {
+    color: #102a43 !important;
+}
+
+/* 버튼 */
+.stButton > button {
+    background-color: #1769aa;
+    color: #ffffff !important;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    min-height: 3rem;
+    transition: all 0.2s ease;
+}
+
+.stButton > button p {
+    color: #ffffff !important;
+}
+
+.stButton > button:hover {
+    background-color: #0f4c81;
+    color: #ffffff !important;
+    border: none;
+    transform: translateY(-2px);
+}
+
+/* 안내 상자 */
+div[data-testid="stAlert"] {
+    border-radius: 12px;
+}
+
+/* 표 */
+div[data-testid="stDataFrame"] {
+    background-color: #ffffff;
+    border-radius: 12px;
+}
+
+/* 탭 */
+button[data-baseweb="tab"] {
+    color: #334e68 !important;
+    font-weight: 600;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #1769aa !important;
+}
+
+/* 확장 메뉴 */
+details summary {
+    color: #102a43 !important;
+    font-weight: 600;
+}
+
+/* 슬라이더 값 */
+div[data-testid="stSlider"] p {
+    color: #243b53 !important;
+}
+
+/* 하단 설명 */
+.caption {
+    color: #627d98 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -124,7 +209,7 @@ st.markdown("""
 <div class="hero">
     <h1>🐧 Penguin AI Lab</h1>
     <p>
-        실제 펭귄 데이터를 학습한 인공지능으로 품종을 예측하고
+        실제 펭귄 데이터를 학습한 인공지능으로 품종을 예측하고,
         두 가지 머신러닝 알고리즘의 결과를 비교합니다.
     </p>
 </div>
@@ -137,14 +222,14 @@ st.markdown("""
 
 @st.cache_data
 def load_data():
+
     data = pd.read_csv("penguins.csv")
 
     required_columns = [
         "species",
         "flipper_length_mm",
         "body_mass_g",
-        "bill_length_mm",
-        "bill_depth_mm"
+        "bill_length_mm"
     ]
 
     missing_columns = [
@@ -170,19 +255,23 @@ try:
     df = load_data()
 
 except FileNotFoundError:
+
     st.error(
         "penguins.csv 파일을 찾을 수 없습니다. "
         "app.py와 같은 폴더에 CSV 파일을 넣어주세요."
     )
+
     st.stop()
 
 except ValueError as e:
+
     st.error(str(e))
+
     st.stop()
 
 
 # ==================================================
-# 4. 데이터와 변수 설정
+# 4. 데이터 변수 설정
 # ==================================================
 
 FEATURES = [
@@ -204,7 +293,7 @@ species_korean = {
     "Gentoo": "젠투펭귄"
 }
 
-# 실제 데이터 범위
+# 실제 데이터의 최솟값과 최댓값
 flipper_min = int(df["flipper_length_mm"].min())
 flipper_max = int(df["flipper_length_mm"].max())
 
@@ -213,9 +302,6 @@ mass_max = int(df["body_mass_g"].max())
 
 bill_min = float(df["bill_length_mm"].min())
 bill_max = float(df["bill_length_mm"].max())
-
-depth_min = float(df["bill_depth_mm"].min())
-depth_max = float(df["bill_depth_mm"].max())
 
 
 # ==================================================
@@ -232,11 +318,11 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 
 # ==================================================
-# 6. 두 가지 분류 알고리즘
+# 6. 두 가지 분류 알고리즘 학습
 # ==================================================
 
 @st.cache_resource
-def train_models(X_train, X_test, y_train, y_test):
+def train_models():
 
     models = {
         "랜덤 포레스트": RandomForestClassifier(
@@ -297,12 +383,7 @@ def train_models(X_train, X_test, y_train, y_test):
 
 with st.spinner("AI 모델을 학습하고 있습니다..."):
 
-    models, model_results = train_models(
-        X_train,
-        X_test,
-        y_train,
-        y_test
-    )
+    models, model_results = train_models()
 
 
 # ==================================================
@@ -340,11 +421,7 @@ with col4:
         f"{len(species_names)}종"
     )
 
-with st.expander("데이터 구성 및 품종별 개체 수"):
-
-    st.write(
-        "CSV 파일에서 필요한 측정값이 모두 존재하는 데이터를 사용합니다."
-    )
+with st.expander("품종별 데이터 확인"):
 
     species_count = (
         df["species"]
@@ -376,7 +453,6 @@ st.info(
     - 날개 길이: {flipper_min}~{flipper_max} mm
     - 몸무게: {mass_min:,}~{mass_max:,} g
     - 부리 길이: {bill_min:.1f}~{bill_max:.1f} mm
-    - 부리 깊이: {depth_min:.1f}~{depth_max:.1f} mm
 
     범위는 업로드한 실제 데이터의 최솟값과 최댓값을 기준으로 합니다.
     """
@@ -418,20 +494,6 @@ with st.container(border=True):
             help="펭귄의 부리 길이를 입력합니다."
         )
 
-        bill_depth = st.slider(
-            "부리 깊이 (mm) · 그래프 표시용",
-            min_value=float(depth_min),
-            max_value=float(depth_max),
-            value=float(df["bill_depth_mm"].median()),
-            step=0.1,
-            help="품종 예측에는 사용하지 않고 그래프에만 표시합니다."
-        )
-
-    st.caption(
-        "부리 깊이는 그래프의 세로축에 사용됩니다. "
-        "품종 예측에는 날개 길이, 몸무게, 부리 길이만 사용합니다."
-    )
-
 
 # ==================================================
 # 9. 예측 실행
@@ -460,7 +522,6 @@ if predict_button:
     )
 
     st.session_state["user_data"] = user_data
-    st.session_state["bill_depth"] = bill_depth
 
     st.session_state["predictions"] = {
         name: model.predict(user_data)[0]
@@ -632,7 +693,7 @@ st.caption(
 
 
 # ==================================================
-# 12. 펭귄 신체 특징 산점도
+# 12. 펭귄 신체 특징 그래프
 # ==================================================
 
 st.markdown(
@@ -641,27 +702,28 @@ st.markdown(
 )
 
 st.write(
-    "가로축은 날개 길이, 세로축은 부리 깊이입니다. "
+    "가로축은 날개 길이, 세로축은 부리 길이입니다. "
     "색상은 실제 품종을 나타내며, 빨간 별은 입력한 펭귄입니다."
 )
 
 fig_scatter = px.scatter(
     df,
     x="flipper_length_mm",
-    y="bill_depth_mm",
+    y="bill_length_mm",
     color="species",
-    hover_data=[
-        "bill_length_mm",
-        "body_mass_g"
-    ],
+    hover_data=["body_mass_g"],
     labels={
         "flipper_length_mm": "날개 길이 (mm)",
-        "bill_depth_mm": "부리 깊이 (mm)",
-        "species": "실제 품종",
         "bill_length_mm": "부리 길이 (mm)",
+        "species": "실제 품종",
         "body_mass_g": "몸무게 (g)"
     },
-    title="실제 펭귄 데이터 분포"
+    title="펭귄의 날개 길이와 부리 길이 분포",
+    color_discrete_sequence=[
+        "#1769aa",
+        "#00a896",
+        "#f28e2b"
+    ]
 )
 
 if st.session_state.get("predicted", False):
@@ -669,7 +731,7 @@ if st.session_state.get("predicted", False):
     fig_scatter.add_trace(
         go.Scatter(
             x=[flipper_length],
-            y=[st.session_state["bill_depth"]],
+            y=[bill_length],
             mode="markers",
             marker=dict(
                 symbol="star",
@@ -684,7 +746,7 @@ if st.session_state.get("predicted", False):
             hovertemplate=(
                 "입력한 펭귄<br>"
                 "날개 길이: %{x} mm<br>"
-                "부리 깊이: %{y} mm"
+                "부리 길이: %{y} mm"
                 "<extra></extra>"
             )
         )
@@ -692,8 +754,13 @@ if st.session_state.get("predicted", False):
 
 fig_scatter.update_layout(
     xaxis_title="날개 길이 (mm)",
-    yaxis_title="부리 깊이 (mm)",
-    legend_title="실제 품종"
+    yaxis_title="부리 길이 (mm)",
+    legend_title="실제 품종",
+    plot_bgcolor="#ffffff",
+    paper_bgcolor="#ffffff",
+    font=dict(
+        color="#172b4d"
+    )
 )
 
 st.plotly_chart(
@@ -744,6 +811,12 @@ for tab, name in zip(
             title=f"{name} 혼동 행렬"
         )
 
+        fig_cm.update_layout(
+            plot_bgcolor="#ffffff",
+            paper_bgcolor="#ffffff",
+            font=dict(color="#172b4d")
+        )
+
         st.plotly_chart(
             fig_cm,
             use_container_width=True
@@ -762,7 +835,8 @@ st.markdown(
 with st.expander("🌳 랜덤 포레스트 작동 원리"):
 
     st.write("""
-    랜덤 포레스트는 여러 개의 의사결정나무를 만들어 예측 결과를 종합하는 알고리즘입니다.
+    랜덤 포레스트는 여러 개의 의사결정나무를 만들어
+    예측 결과를 종합하는 알고리즘입니다.
 
     1. 학습 데이터를 무작위로 선택해 여러 학습용 데이터 집합을 만듭니다.
     2. 각각의 데이터 집합으로 의사결정나무를 학습시킵니다.
@@ -776,8 +850,8 @@ with st.expander("🌳 랜덤 포레스트 작동 원리"):
 with st.expander("🎯 서포트 벡터 머신 작동 원리"):
 
     st.write("""
-    서포트 벡터 머신(SVM)은 서로 다른 품종의 데이터를 가장 잘 구분하는
-    경계선을 찾는 알고리즘입니다.
+    서포트 벡터 머신(SVM)은 서로 다른 품종의 데이터를
+    가장 잘 구분하는 경계선을 찾는 알고리즘입니다.
 
     1. 펭귄의 신체 측정값을 좌표상의 점으로 나타냅니다.
     2. 품종을 가장 잘 구분할 수 있는 경계를 학습합니다.
