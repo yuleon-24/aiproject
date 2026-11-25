@@ -28,89 +28,175 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+    /* 전체 페이지 배경색 */
     .stApp {
-        background: linear-gradient(
-            180deg,
-            #f4f8fc 0%,
-            #ffffff 45%,
-            #f0f7ff 100%
-        );
+        background: #F4F7FB !important;
+        color: #172B4D !important;
     }
 
+    /* 기본 글씨 색상 */
+    .stApp p,
+    .stApp label,
+    .stApp li,
+    .stApp h1,
+    .stApp h2,
+    .stApp h3,
+    .stApp h4,
+    .stApp span,
+    .stApp div {
+        color: #172B4D;
+    }
+
+    /* 본문 너비와 여백 */
     .block-container {
         max-width: 1250px;
         padding-top: 2rem;
         padding-bottom: 4rem;
     }
 
+    /* 상단 소개 영역 */
     .hero {
         padding: 30px;
         border-radius: 24px;
-        background: linear-gradient(
-            120deg,
-            #102a43 0%,
-            #245b83 60%,
-            #3c83a5 100%
-        );
-        color: white;
+        background: #173B5E !important;
+        color: #FFFFFF !important;
         margin-bottom: 24px;
         box-shadow: 0 10px 30px rgba(16,42,67,0.15);
     }
 
     .hero h1 {
-        color: white;
+        color: #FFFFFF !important;
         font-size: 2.5rem;
         margin-bottom: 8px;
     }
 
     .hero p {
-        color: #dceaf5;
+        color: #EAF2F8 !important;
         font-size: 1.05rem;
     }
 
+    /* 요약 카드 */
     .metric-card {
-        background: white;
-        border: 1px solid #e5edf5;
+        background: #FFFFFF;
+        border: 1px solid #D7E1EC;
         border-radius: 16px;
         padding: 18px;
         box-shadow: 0 4px 14px rgba(16,42,67,0.05);
     }
 
     .metric-label {
-        color: #64748b;
+        color: #52677D !important;
         font-size: 0.9rem;
     }
 
     .metric-value {
-        color: #102a43;
+        color: #172B4D !important;
         font-size: 1.7rem;
         font-weight: 700;
         margin-top: 6px;
     }
 
+    /* 소제목 */
     .section-title {
-        color: #102a43;
+        color: #173B5E !important;
         font-size: 1.45rem;
         font-weight: 700;
         margin-top: 20px;
         margin-bottom: 12px;
     }
 
+    /* Streamlit 지표 카드 */
     div[data-testid="stMetric"] {
-        background: white;
-        border: 1px solid #e5edf5;
+        background: #FFFFFF !important;
+        border: 1px solid #D7E1EC;
         border-radius: 14px;
         padding: 16px;
     }
 
-    div[data-testid="stSidebar"] {
-        background-color: #edf4fa;
+    div[data-testid="stMetric"] label,
+    div[data-testid="stMetric"] [data-testid="stMetricValue"],
+    div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
+        color: #172B4D !important;
     }
 
+    /* 사이드바 */
+    div[data-testid="stSidebar"] {
+        background-color: #E8EEF5 !important;
+    }
+
+    div[data-testid="stSidebar"] p,
+    div[data-testid="stSidebar"] label,
+    div[data-testid="stSidebar"] span {
+        color: #172B4D !important;
+    }
+
+    /* 입력창 */
+    .stApp input,
+    .stApp textarea {
+        background-color: #FFFFFF !important;
+        color: #172B4D !important;
+        border-color: #B8C9DA !important;
+    }
+
+    /* 선택 상자 */
+    .stApp [data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #172B4D !important;
+    }
+
+    /* 슬라이더 숫자 및 라벨 */
+    .stSlider label,
+    .stSlider [data-testid="stMarkdownContainer"] {
+        color: #172B4D !important;
+    }
+
+    /* 버튼 */
     .stButton > button {
+        background-color: #145DA0 !important;
+        color: #FFFFFF !important;
+        border: 1px solid #145DA0 !important;
         border-radius: 12px;
         font-weight: 700;
         min-height: 3rem;
+    }
+
+    .stButton > button p,
+    .stButton > button span {
+        color: #FFFFFF !important;
+    }
+
+    .stButton > button:hover {
+        background-color: #0F477C !important;
+        border-color: #0F477C !important;
+    }
+
+    /* 정보 상자 */
+    div[data-testid="stAlert"] {
+        background-color: #EAF3FF !important;
+        border-color: #B8D6F5 !important;
+    }
+
+    /* 데이터 표 */
+    [data-testid="stDataFrame"] {
+        background-color: #FFFFFF !important;
+    }
+
+    /* 탭 */
+    button[data-baseweb="tab"] {
+        color: #172B4D !important;
+    }
+
+    /* 펼치기 영역 */
+    details {
+        background-color: #FFFFFF;
+        border: 1px solid #D7E1EC;
+        border-radius: 12px;
+    }
+
+    /* 캡션 글씨 */
+    .stCaption,
+    [data-testid="stCaptionContainer"] {
+        color: #52677D !important;
     }
 </style>
 """, unsafe_allow_html=True)
